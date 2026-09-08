@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0d0932" />
+    <title>曜充 · 全域能源监测</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="dashboard.css?v=20260905-2" />
+    <link rel="stylesheet" href="dashboard-details.css?v=20260905-3" />
+    <link rel="stylesheet" href="dashboard-analytics.css?v=20260905-4" />
+  </head>
+  <body class="screen-page">
+    <canvas id="particles" aria-hidden="true"></canvas>
+    <main class="screen-shell">
+      <header class="screen-header">
+        <a class="screen-brand" href="dashboard.html"
+          ><b>曜充—全域能源监测</b><small id="dashboard-date"></small
+        ></a>
+        <div class="header-rail"></div>
+        <nav class="screen-nav">
+          <button class="active" data-view="overview">全域总览</button
+          ><button data-view="stations">站点态势</button
+          ><button data-view="orders">订单分析</button>
+        </nav>
+        <div class="header-tools">
+          <button id="admin-connect">
+            <i></i><span id="mode-label">连接中</span></button
+          ><time id="clock"></time
+          ><button id="refresh" title="刷新数据" aria-label="刷新数据">↻</button
+          ><button id="fullscreen" title="全屏" aria-label="全屏">
+            <svg viewBox="0 0 24 24">
+              <path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5" />
+            </svg></button
+          ><a href="mobile.html">APP ↗</a>
+        </div>
+      </header>
+      <section class="reference-layout view-panel active" id="view-overview">
+        <div class="global-view">
+          <div class="globe-scene">
+            <img src="assets/energy-globe.svg" alt="紫色数字地球与中国省界" />
+            <div class="globe-location">
+              <span class="beacon"></span><b>深圳市</b
+              ><button id="globe-focus" title="查看深圳站点">
+                <strong id="globe-available">--</strong><small>把空闲枪</small>
+              </button>
+            </div>
+            <div class="orbit-caption">CHINA · SMART ENERGY NETWORK</div>
+          </div>
+          <div class="global-kpis">
+            <div class="hero-number">
+              <svg viewBox="0 0 24 24">
+                <path d="M3 21v-5M8 21V9M13 21V3M18 21v-9M23 21V6" /></svg
+              ><strong id="hero-energy">--</strong><span>kWh</span>
+            </div>
+            <p>典型日累计充电量</p>
+            <div class="micro-kpi">
+              <i>▥</i><strong data-kpi="chargers">--</strong
+              ><small>接入充电设备</small>
+            </div>
+            <div class="micro-kpi">
+              <i>▥</i><strong data-kpi="stations">--</strong
+              ><small>已接入站点</small>
+            </div>
+            <div class="micro-kpi">
+              <i>▥</i><strong id="hero-utilization">--</strong
+              ><small>实时设备利用率</small>
+            </div>
+          </div>
+          <div class="left-breakdowns">
+            <article class="viz-panel mini-panel">
+              <header>
+                <h2>平台运行概况</h2>
+                <span></span>
+              </header>
+              <div id="platform-bars" class="compact-bars"></div>
+            </article>
+            <article class="viz-panel mini-panel">
+              <header>
+                <h2>城市站点分布</h2>
+                <span></span>
+              </header>
+              <div id="city-bars" class="compact-bars"></div>
+            </article>
+          </div>
+          <article class="viz-panel trend-panel">
+            <header>
+              <h2>24小时能源趋势</h2>
+              <span>UrbanEV · 典型日</span>
+            </header>
+            <div class="trend-chart">
+              <svg
+                id="revenue-chart"
+                viewBox="0 0 900 190"
+                preserveAspectRatio="none"
+                aria-label="24小时充电量"
+              ></svg>
+              <div id="trend-tooltip" class="trend-tooltip"></div>
+            </div>
+          </article>
+        </div>
+        <div class="right-matrix">
+          <article class="viz-panel device-panel">
+            <header>
+              <h2>站点设备分布概况</h2>
+              <span>实时</span>
+            </header>
+            <div class="pie-layout">
+              <div id="device-pie" class="pie-chart"><span></span></div>
+              <div id="device-legend" class="mini-legend"></div>
+            </div>
+          </article>
+          <article class="viz-panel scale-panel">
+            <header>
+              <h2>站点规模类型概况</h2>
+              <span></span>
+            </header>
+            <div class="orbit-layout">
+              <svg
+                id="scale-rings"
+                viewBox="0 0 150 150"
+                aria-label="站点规模占比"
+              ></svg>
+              <div id="scale-legend" class="mini-legend"></div>
+            </div>
+          </article>
+          <article class="viz-panel capacity-panel">
+            <header>
+              <h2>站点资源排行榜</h2>
+              <span>TOP 5</span>
+            </header>
+            <div id="capacity-ranking" class="line-ranking"></div>
+          </article>
+          <article class="viz-panel spotlight-panel">
+            <header>
+              <h2>重点站点实时概况</h2>
+              <span></span>
+            </header>
+            <button class="station-spotlight" id="station-spotlight">
+              <div class="station-visual">
+                <svg viewBox="0 0 200 120">
+                  <defs>
+                    <linearGradient id="chargerFace" x2="1" y2="1">
+                      <stop stop-color="#36c4d9" />
+                      <stop offset="1" stop-color="#162657" />
+                    </linearGradient>
+                  </defs>
+                  <ellipse
+                    cx="100"
+                    cy="104"
+                    rx="66"
+                    ry="10"
+                    fill="#09d9df"
+                    opacity=".12"
+                  />
+                  <path
+                    d="M62 105V18l18-8h46v95z"
+                    fill="url(#chargerFace)"
+                    stroke="#62ecf2"
+                  />
+                  <path
+                    d="M62 18h47v87M109 18l17-8"
+                    fill="none"
+                    stroke="#77d8e2"
+                  />
+                  <path d="M75 31h23v30H75z" fill="#0a1536" stroke="#429ebf" />
+                  <path d="m89 35-9 14h8l-4 9 11-14h-8z" fill="#5bf3f8" />
+                  <path
+                    d="M127 35h10q10 0 10 13v35q0 14-12 14t-12-13V68"
+                    fill="none"
+                    stroke="#65bcd1"
+                    stroke-width="4"
+                  />
+                  <path d="M79 82h17M79 87h17" stroke="#6befeb" /></svg
+                ><span class="station-visual-grid"></span>
+              </div>
+              <div>
+                <strong id="spotlight-rate">--</strong
+                ><small>空闲充电枪占比</small
+                ><b id="spotlight-name">站点加载中</b
+                ><em id="spotlight-detail">点击查看站点</em>
+              </div>
+            </button>
+          </article>
+          <article class="viz-panel load-panel">
+            <header>
+              <h2>典型时段负载分布</h2>
+              <span></span>
+            </header>
+            <div class="load-distribution">
+              <div class="load-labels" id="load-labels"></div>
+              <div class="ring-chart" id="load-ring">
+                <span
+                  ><strong id="current-load">--</strong
+                  ><small id="load-hour">当前时段</small></span
+                >
+              </div>
+            </div>
+          </article>
+          <article class="viz-panel resource-panel">
+            <header>
+              <h2>充电资源实时占比</h2>
+              <span></span>
+            </header>
+            <div class="twin-rings">
+              <div>
+                <div class="ring-chart" id="available-ring">
+                  <span><strong id="available-share">--</strong></span>
+                </div>
+                <small>空闲设备</small>
+              </div>
+              <div>
+                <div class="ring-chart" id="charging-ring">
+                  <span><strong id="charging-share">--</strong></span>
+                </div>
+                <small>充电设备</small>
+              </div>
+            </div>
+          </article>
+          <article class="viz-panel station-rank-panel">
+            <header>
+              <h2>站点设备规模排行</h2>
+              <span></span>
+            </header>
+            <div id="station-ranking" class="bottom-ranking"></div>
+          </article>
+          <article class="viz-panel energy-rank-panel">
+            <header>
+              <h2>高负载时段排行</h2>
+              <span></span>
+            </header>
+            <div id="hour-ranking" class="bottom-ranking"></div>
+          </article>
+        </div>
+      </section>
+      <section class="detail-layout view-panel" id="view-stations">
+        <div class="detail-left station-left">
+          <div class="regional-map">
+            <img
+              src="assets/shenzhen-region.svg"
+              alt="深圳市行政区划和充电站点分布"
+            />
+            <div id="regional-nodes"></div>
+            <span class="region-label" style="left: 45.264%; top: 59.182%"
+              >罗湖区</span
+            ><span class="region-label" style="left: 35.985%; top: 62.925%"
+              >福田区</span
+            ><span class="region-label" style="left: 26.295%; top: 62.669%"
+              >南山区</span
+            ><span class="region-label" style="left: 18.605%; top: 47.118%"
+              >宝安区</span
+            ><span class="region-label" style="left: 51.056%; top: 45.123%"
+              >龙岗区</span
+            ><span class="region-label" style="left: 56.912%; top: 56.82%"
+              >盐田区</span
+            ><span class="region-label" style="left: 34.907%; top: 46.181%"
+              >龙华区</span
+            ><span class="region-label" style="left: 64.875%; top: 45.536%"
+              >坪山区</span
+            ><span class="region-label" style="left: 25.447%; top: 36.762%"
+              >光明区</span
+            >
+
+            <div class="region-coordinate">SHENZHEN / 22°32′ N · 114°03′ E</div>
+          </div>
+          <div class="telemetry-hero">
+            <small>STATION NETWORK / 站点实时态势</small>
+            <div class="hero-number">
+              <strong data-kpi="stations">--</strong><span>座充电站</span>
+            </div>
+            <p>连接城市的每一度绿色能源</p>
+          </div>
+          <div class="side-telemetry">
+            <div>
+              <small>设备接入</small><strong id="network-devices">--</strong
+              ><em>把充电枪</em>
+            </div>
+            <div>
+              <small>可用资源</small><strong id="network-available">--</strong
+              ><em>把空闲枪</em>
+            </div>
+            <div>
+              <small>可用设备占比</small><strong id="network-share">--</strong
+              ><em></em>
+            </div>
+          </div>
+          <div class="region-selected">
+            <span class="beacon"></span><small>当前监测站点</small>
+            <h2 id="region-station-name">站点加载中</h2>
+            <p id="region-station-address"></p>
+            <div>
+              <strong id="region-free">--</strong
+              ><span>空闲 / <b id="region-total">--</b> 枪</span>
+            </div>
+          </div>
+          <article class="viz-panel detail-bottom">
+            <header>
+              <h2>站点资源分布</h2>
+              <span>前 8 站 · 枪数</span>
+            </header>
+            <div id="station-resource-bars" class="resource-columns"></div>
+          </article>
+        </div>
+        <div class="detail-right station-right">
+          <article class="viz-panel monitor-panel">
+            <header>
+              <h2>重点站点设备监测</h2>
+              <span>当前站点</span>
+            </header>
+            <div class="detail-gauge">
+              <div class="ring-chart" id="station-free-ring">
+                <span
+                  ><strong id="station-free-share">--</strong
+                  ><small>空闲占比</small></span
+                >
+              </div>
+              <div class="gauge-legend" id="station-gauge-legend"></div>
+            </div>
+          </article>
+          <article class="viz-panel monitor-panel">
+            <header>
+              <h2>站点能源服务参数</h2>
+              <span></span>
+            </header>
+            <div class="price-hero">
+              <small>综合电价</small
+              ><strong>¥ <b id="station-price">--</b><em>/ kWh</em></strong>
+            </div>
+            <div class="parameter-row">
+              <span>最大功率<b id="station-max-power">--</b></span
+              ><span>数据来源<b id="station-source">--</b></span>
+            </div>
+          </article>
+          <article class="viz-panel monitor-panel">
+            <header>
+              <h2>站点规模效能排行</h2>
+              <span>TOP 5 · 设备规模</span>
+            </header>
+            <div id="network-rank" class="bottom-ranking"></div>
+          </article>
+          <article class="viz-panel monitor-panel">
+            <header>
+              <h2>站点实时资源状态</h2>
+              <span></span>
+            </header>
+            <div id="station-resource-summary" class="status-matrix"></div>
+            <p class="data-footnote">设备状态随运营数据每 30 秒同步</p>
+          </article>
+          <article class="viz-panel ledger-panel station-ledger">
+            <header>
+              <h2>站点实时态势清单</h2>
+              <span>点击行联动地图</span>
+            </header>
+            <div class="ledger-tools">
+              <label
+                ><span>⌕</span
+                ><input
+                  id="station-search"
+                  placeholder="搜索站点名称或地址"
+                  aria-label="搜索站点名称或地址" /></label
+              ><span id="station-results"></span
+              ><button class="primary small" id="add-station">新增站点</button>
+            </div>
+            <div class="data-table" id="stations-table"></div>
+          </article>
+        </div>
+      </section>
+      <section class="detail-layout view-panel" id="view-orders">
+        <div class="detail-left order-left">
+          <div class="orders-globe">
+            <img src="assets/energy-globe.svg" alt="紫色数字地球背景" />
+          </div>
+          <div class="telemetry-hero">
+            <small>TRANSACTION INSIGHT / 订单运营分析</small>
+            <div class="hero-number">
+              <span>¥</span><strong data-kpi="total_revenue">--</strong>
+            </div>
+            <p>累计已结算营收</p>
+          </div>
+          <div class="side-telemetry">
+            <div>
+              <small>今日营收</small
+              ><strong id="orders-today-revenue">--</strong><em>元</em>
+            </div>
+            <div>
+              <small>今日订单</small><strong id="orders-today-count">--</strong
+              ><em>笔</em>
+            </div>
+            <div>
+              <small>累计已完成</small><strong id="orders-completed">--</strong
+              ><em>笔</em>
+            </div>
+          </div>
+          <div class="transaction-orbit">
+            <span class="orbit-ring"></span
+            ><span class="orbit-ring second"></span
+            ><small>CHARGING TRANSACTIONS</small
+            ><strong data-kpi="completed_orders">--</strong><b>累计完成订单</b
+            ><span class="orbit-live"><i></i> 交易数据实时同步</span>
+          </div>
+          <article class="viz-panel detail-bottom">
+            <header>
+              <h2>近七日营收趋势</h2>
+              <span>已结算营收 · 元</span>
+            </header>
+            <div class="finance-chart">
+              <svg
+                id="finance-chart"
+                viewBox="0 0 900 200"
+                preserveAspectRatio="none"
+                aria-label="近七日营收趋势"
+              ></svg>
+            </div>
+          </article>
+        </div>
+        <div class="detail-right orders-right">
+          <article class="viz-panel monitor-panel">
+            <header>
+              <h2>近七日交易概况</h2>
+              <span>公开统计</span>
+            </header>
+            <div class="trading-summary">
+              <div>
+                <small>近七日营收</small><strong id="week-revenue">--</strong
+                ><em>元</em>
+              </div>
+              <div>
+                <small>近七日订单</small><strong id="week-orders">--</strong
+                ><em>笔</em>
+              </div>
+              <div>
+                <small>订单平均金额</small><strong id="week-average">--</strong
+                ><em>元</em>
+              </div>
+            </div>
+          </article>
+          <article class="viz-panel monitor-panel">
+            <header>
+              <h2>最近订单状态分布</h2>
+              <span>最近 20 笔</span>
+            </header>
+            <div id="order-state-chart" class="order-state-chart"></div>
+          </article>
+          <article class="viz-panel occupancy-panel">
+            <header>
+              <h2>24小时站点占用趋势</h2>
+              <span>UrbanEV · 典型日样本</span>
+            </header>
+            <div class="occupancy-chart">
+              <div class="bar-chart" id="order-bars"></div>
+            </div>
+          </article>
+          <article class="viz-panel ledger-panel order-ledger">
+            <header>
+              <h2>最近充电交易明细</h2>
+              <span>实时订单</span>
+            </header>
+            <div class="ledger-tools">
+              <span id="order-results">等待同步</span
+              ><button id="orders-connect" class="text-button">
+                连接管理员账户 ↗
+              </button>
+            </div>
+            <div class="data-table" id="orders-table"></div>
+          </article>
+        </div>
+      </section>
+      <footer class="screen-footer">
+        <span>YAOCHARGE · DIGITAL ENERGY</span
+        ><span
+          >运营数据实时同步 / 地球为全域背景，业务站点位于深圳 / UrbanEV
+          为典型日样本</span
+        ><span id="update-time">--</span>
+      </footer>
+    </main>
+    <dialog id="admin-dialog">
+      <button class="dialog-close" data-close aria-label="关闭">×</button>
+      <span class="dialog-mark"><i></i></span><small>OPERATIONS CONSOLE</small>
+      <h2>连接运营中心</h2>
+      <p>登录管理员账户后，大屏将读取 PostgreSQL 中的实时运营数据。</p>
+      <label
+        >管理员账号<input id="admin-name" autocomplete="username" value="admin"
+      /></label>
+      <label
+        >密码<input
+          id="admin-password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="请输入管理员密码"
+      /></label>
+      <button class="primary full" id="admin-login">登录并同步</button>
+      <button class="demo-link" id="admin-disconnect">退出管理员视图</button>
+    </dialog>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="dashboard-details.js?v=20260905-3"></script>
+    <script src="dashboard.js?v=20260905-3"></script>
+    <script src="dashboard-analytics.js?v=20260905-4"></script>
+  </body>
+</html>

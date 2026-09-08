@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#080511" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23c84cff' d='M18 1 6 18h9l-2 13 13-19h-9z'/%3E%3C/svg%3E"
+    />
+    <title>曜充 · 电动汽车充电</title>
+    <link rel="stylesheet" href="assets/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mobile.css" />
+    <link rel="stylesheet" href="mobile-reference.css?v=20260906-1" />
+  </head>
+  <body class="mobile-page">
+    <main class="phone-app">
+      <div class="app-status">
+        <span id="app-clock">9:41</span><span class="status-island"></span
+        ><span class="status-icons"
+          >▮▮▮
+          <svg viewBox="0 0 20 16">
+            <path d="M2 5Q10-2 18 5M5 8Q10 3 15 8M8 11Q10 9 12 11" /></svg
+          ><i></i
+        ></span>
+      </div>
+      <section class="mobile-screen home-screen active" id="screen-home">
+        <header class="car-header">
+          <h1>MG-4 Luxury <small>我的电动座驾</small></h1>
+          <div>
+            <button
+              class="round-action"
+              data-screen="profile"
+              aria-label="车辆账户"
+            >
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="m5 9 2-5h10l2 5M4 17V9h16v8H4ZM6 17v3M18 17v3M7 12h2M15 12h2"
+                />
+              </svg></button
+            ><button
+              class="round-action"
+              id="notifications"
+              aria-label="消息通知"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M6 10a6 6 0 0112 0v5l2 3H4l2-3zM10 21h4" /></svg
+              ><i></i>
+            </button>
+          </div>
+        </header>
+        <article class="car-overview">
+          <div class="battery-summary">
+            <span class="battery-3d"><i></i><b>ϟ</b></span>
+            <div>
+              <small>Charging Level</small><strong>60<em>%</em></strong>
+            </div>
+          </div>
+          <div class="vehicle-reading">
+            <span>◉</span>
+            <div>
+              <small>累计里程</small><b>35,245<em> km</em></b>
+            </div>
+          </div>
+          <div class="vehicle-reading">
+            <span>♧</span>
+            <div>
+              <small>剩余续航</small><b>215.5<em> km</em></b>
+            </div>
+          </div>
+          <img
+            class="front-car"
+            src="assets/ev-photo.png"
+            alt="银灰色电动汽车，前侧视角"
+          /><small class="vehicle-demo">演示车辆</small>
+        </article>
+        <article class="home-map-card">
+          <header>
+            <span>♙</span>
+            <h2>附近充电站</h2>
+            <button data-screen="map" aria-label="打开充电地图">↗</button>
+          </header>
+          <div id="home-map" aria-label="附近充电站预览地图"></div>
+          <button class="map-open" data-screen="map">
+            探索附近站点 <span>↗</span>
+          </button>
+        </article>
+        <button class="home-session" data-screen="charge">
+          <span class="session-icon">ϟ</span
+          ><span
+            ><b id="home-charge-state">智能充电</b
+            ><small id="home-charge-hint">查看充电状态与能量流动</small></span
+          ><em>→</em>
+        </button>
+        <div id="home-stations" class="home-stations"></div>
+      </section>
+      <section class="mobile-screen" id="screen-map">
+        <header class="mobile-top">
+          <button class="map-back back" data-back="home" aria-label="返回首页">
+            ‹
+          </button>
+          <div>
+            <small>当前位置</small
+            ><button id="location-name">
+              深圳市 <svg viewBox="0 0 24 24"><path d="m8 10 4 4 4-4" /></svg>
+            </button>
+          </div>
+          <button class="avatar" data-screen="profile" aria-label="个人中心">
+            L
+          </button>
+        </header>
+        <div class="mobile-search">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m16 16 4 4" /></svg
+          ><input id="map-search" placeholder="搜索充电站" /><button
+            id="filter-button"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" />
+            </svg>
+          </button>
+        </div>
+        <div class="ev-map" id="ev-map">
+          <div id="leaflet-map" aria-label="深圳充电站地图"></div>
+          <button class="locate-button" id="locate" aria-label="定位">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              <circle cx="12" cy="12" r="5" />
+            </svg>
+          </button>
+          <div class="zoom-controls">
+            <button data-zoom="in">+</button><button data-zoom="out">−</button>
+          </div>
+        </div>
+        <article class="station-sheet" id="station-sheet">
+          <button class="sheet-handle" aria-label="展开站点详情"></button>
+          <div class="station-title">
+            <div class="station-photo">
+              <svg viewBox="0 0 80 80">
+                <defs>
+                  <linearGradient id="stationGlow">
+                    <stop stop-color="#eb55ff" />
+                    <stop offset="1" stop-color="#6524ff" />
+                  </linearGradient>
+                </defs>
+                <rect width="80" height="80" rx="18" fill="#171126" />
+                <path
+                  d="M14 55h52v9H14zM21 51V29l18-9 20 9v22M29 51V36h22v15"
+                  fill="none"
+                  stroke="url(#stationGlow)"
+                  stroke-width="4"
+                />
+                <path d="m42 28-8 13h7l-2 12 10-16h-7z" fill="#fff" />
+              </svg>
+            </div>
+            <div>
+              <h1 id="station-name">高新园充电站</h1>
+              <p id="station-address">创新路 1 号 · 1.8 km</p>
+            </div>
+            <button class="favorite" aria-label="收藏">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 21s-8-4.7-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 6.3-8 11-8 11z"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="station-facts">
+            <span
+              ><svg viewBox="0 0 24 24">
+                <path d="m13 2-7 12h6l-1 8 7-12h-6z" /></svg
+              ><b id="station-power">120 kW</b><small>最大功率</small></span
+            ><span
+              ><svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" /></svg
+              ><b id="station-time">18 分钟</b><small>预计充满</small></span
+            ><span
+              ><svg viewBox="0 0 24 24">
+                <path d="M5 20V7h14v13M8 7V3h8v4" /></svg
+              ><b id="station-free">8 / 12</b><small>空闲充电枪</small></span
+            >
+          </div>
+          <div class="station-actions">
+            <button class="secondary" id="route-button">
+              <svg viewBox="0 0 24 24"><path d="m4 11 16-7-7 16-2-7z" /></svg
+              >路线</button
+            ><button class="primary" id="detail-button">查看充电枪</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="mobile-screen detail-screen" id="screen-detail">
+        <header class="detail-header">
+          <button class="back" data-back="map">
+            <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <h1 id="detail-page-title">充电站</h1>
+          <button class="icon-button">
+            <svg viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </button>
+        </header>
+        <div class="energy-life">
+          <div class="segment charge-mode">
+            <button class="active" data-mode="eco">Eco Mode</button
+            ><button data-mode="fast">Fast Charging</button>
+          </div>
+          <article class="energy-card">
+            <h2><span>ϟ</span> Energy Life</h2>
+            <div class="top-car-wrap">
+              <img src="assets/ev-top-photo.png" alt="白色电动车俯视图" /><b
+                >40%</b
+              >
+            </div>
+            <div class="energy-readings">
+              <span
+                ><b>40<small>%</small></b
+                ><small>Charging Level</small></span
+              ><span
+                ><b>134<small> km</small></b
+                ><small>Charging range</small></span
+              >
+            </div>
+            <label class="charge-limit"
+              >充电上限
+              <select id="charge-limit">
+                <option value="70">70%</option>
+                <option value="80">80%</option>
+                <option value="100">100%</option>
+              </select></label
+            ><small class="vehicle-demo">演示车辆 · 充电上限仅用于显示</small>
+          </article>
+        </div>
+        <div class="detail-hero">
+          <div>
+            <span class="eyebrow">YAOCHARGE STATION</span>
+            <h2 id="detail-station-name">正在载入站点</h2>
+            <p id="detail-station-address">深圳市 · 营业中</p>
+          </div>
+          <div class="availability">
+            <b id="detail-free">0</b><small>个空闲</small>
+          </div>
+        </div>
+        <details class="connector-picker">
+          <summary>
+            选择充电枪 <span id="selected-connector-label">查看空闲设备</span>
+          </summary>
+          <div class="segment">
+            <button class="active" data-kind="all">全部</button
+            ><button data-kind="fast">快充</button
+            ><button data-kind="slow">慢充</button>
+          </div>
+          <div class="connector-list" id="connector-list"></div>
+        </details>
+        <article class="charge-estimate">
+          <div>
+            <span>▣ 预计补充电量</span><b id="estimated-energy">18.0 kWh</b>
+          </div>
+          <div><span>◉ 当前单价</span><b id="estimated-rate">—</b></div>
+          <div><span>▧ 预估费用</span><b id="estimated-total">—</b></div>
+          <small>按演示车辆 60 kWh 容量估算，实际以订单结算为准</small>
+        </article>
+        <div class="reserve-bar">
+          <div>
+            <small>预估单价</small
+            ><b>¥ <span id="unit-price">1.20</span><i>/kWh</i></b>
+          </div>
+          <button class="primary" id="reserve-button">立即预约</button>
+        </div>
+      </section>
+
+      <section class="mobile-screen charge-screen" id="screen-charge">
+        <header class="detail-header">
+          <button class="back" data-back="home">
+            <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <h1>充电详情</h1>
+          <button class="icon-button">
+            <svg viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </button>
+        </header>
+        <div class="charge-title">
+          <small class="charge-eyebrow">POWER UP YOUR JOURNEY</small
+          ><span class="live-chip"
+            ><i></i><em id="charge-state">等待连接</em></span
+          >
+          <h2 id="charge-station">为下一程蓄能</h2>
+          <p id="charge-code">选择附近充电站，开启充电</p>
+        </div>
+        <div class="energy-orb">
+          <div class="orb-halo"></div>
+          <img
+            class="plasma-art"
+            src="assets/charging-plasma.png"
+            alt=""
+            aria-hidden="true"
+          /><canvas id="orb-canvas"></canvas>
+          <div class="orb-value">
+            <b id="charge-percent">36<sup>%</sup></b
+            ><span>演示电量 · 非车辆实测</span>
+          </div>
+        </div>
+        <div class="charge-metrics">
+          <span><b id="charge-minutes">--</b><small>分钟后充满</small></span
+          ><span><b id="charge-energy">0.0</b><small>已充电 kWh</small></span
+          ><span
+            ><b>¥ <i id="charge-cost">0.00</i></b
+            ><small>当前费用</small></span
+          >
+        </div>
+        <div class="charge-progress"><i id="charge-bar"></i></div>
+        <div class="charge-note">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18M5 8h14M5 16h14" /></svg
+          ><span><b>智能快充模式</b><small>订单电量和费用实时同步</small></span
+          ><em id="charge-power">-- kW</em>
+        </div>
+        <button class="stop-button" id="stop-button">
+          <span></span>查找充电站
+        </button>
+      </section>
+
+      <section class="mobile-screen list-screen" id="screen-orders">
+        <header class="page-title">
+          <div>
+            <small>CHARGING HISTORY</small>
+            <h1>充电记录</h1>
+          </div>
+          <button class="icon-button" id="refresh-orders">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+            </svg>
+          </button>
+        </header>
+        <div class="history-summary">
+          <div>
+            <small>最近订单电量</small
+            ><b><span id="history-energy">0.0</span> <i>kWh</i></b>
+          </div>
+          <div>
+            <small>最近订单支出</small
+            ><b>¥ <span id="history-cost">0.00</span></b>
+          </div>
+          <svg viewBox="0 0 220 75">
+            <path
+              d="M2 67C25 54 34 61 53 37s30 10 51-5 26-29 43-12 30 22 43-5 24-11 28-14"
+            />
+          </svg>
+        </div>
+        <div class="section-label">
+          <h2>最近记录</h2>
+          <button>全部</button>
+        </div>
+        <div class="order-list" id="mobile-orders"></div>
+      </section>
+
+      <section class="mobile-screen stats-screen" id="screen-stats">
+        <header class="detail-header">
+          <button class="back" data-back="home" aria-label="返回首页">‹</button>
+          <h1>充电统计</h1>
+          <button
+            class="round-action"
+            data-screen="orders"
+            aria-label="查看我的订单"
+          >
+            ≡
+          </button>
+        </header>
+        <div class="segment stats-period">
+          <button data-period="month" class="active">月度</button
+          ><button data-period="year">年度</button>
+        </div>
+        <article class="stats-card">
+          <h2>▣ <span id="stats-period-label">最近 31 天</span></h2>
+          <div class="stats-totals">
+            <span><b id="stats-energy">—</b><small>累计充电 · kWh</small></span
+            ><span
+              ><b id="stats-cost">—</b
+              ><small id="stats-second-label">日均电量 · kWh</small></span
+            >
+          </div>
+          <div id="stats-chart" class="stats-chart"></div>
+          <div id="stats-legend" class="stats-legend"></div>
+          <p class="dataset-caption" id="stats-source">
+            正在载入 UrbanEV 历史观测…
+          </p>
+        </article>
+        <article class="stats-card cost-card">
+          <header>
+            <h2>▧ 区域用电概览</h2>
+            <small>kWh</small>
+          </header>
+          <div id="cost-breakdown"></div>
+        </article>
+        <button class="schedule-link" data-screen="schedule">
+          <span>◷ 分时电价</span><small>查看 24 小时电价变化</small
+          ><b>↗</b></button
+        ><button class="personal-orders" data-screen="orders">
+          我的充电订单 <span>→</span>
+        </button>
+      </section>
+      <section class="mobile-screen schedule-screen" id="screen-schedule">
+        <header class="detail-header">
+          <button class="back" data-back="stats" aria-label="返回统计">
+            ‹
+          </button>
+          <h1>分时用电</h1>
+          <button class="round-action" data-screen="map" aria-label="前往找桩">
+            ϟ
+          </button>
+        </header>
+        <div class="segment schedule-period">
+          <button class="active" data-tariff="all">全天</button
+          ><button data-tariff="low">低价时段</button
+          ><button data-tariff="high">高价时段</button>
+        </div>
+        <div class="schedule-layout">
+          <div class="schedule-list" id="tariff-list"></div>
+          <div class="time-rail" id="time-rail"></div>
+        </div>
+        <p class="dataset-caption">
+          UrbanEV 历史平均电价 · 实际计费以站点公示为准
+        </p>
+      </section>
+      <section class="mobile-screen profile-screen" id="screen-profile">
+        <header class="page-title">
+          <div>
+            <small>YOUR ACCOUNT</small>
+            <h1>我的</h1>
+          </div>
+          <button class="icon-button" id="settings-button">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19 12a7 7 0 00-.1-1l2-1.5-2-3.4-2.3 1A7 7 0 0015 6l-.3-2.5h-4L10.4 6a7 7 0 00-1.7 1L6.4 6 4.4 9.5l2 1.5a7 7 0 000 2L4.4 14.5l2 3.5 2.3-1a7 7 0 001.7 1l.3 2.5h4L15 18a7 7 0 001.7-1l2.3 1 2-3.5-2-1.5a7 7 0 000-1z"
+              />
+            </svg>
+          </button>
+        </header>
+        <div class="profile-card">
+          <div class="profile-avatar">L<span></span></div>
+          <div>
+            <h2 id="profile-name">欢迎使用曜充</h2>
+            <p id="profile-phone">登录后开启绿色出行</p>
+          </div>
+          <button id="login-button">连接账户</button>
+        </div>
+        <div class="wallet-card">
+          <small>账户余额</small><b>¥ <span id="balance">--</span></b>
+          <div>
+            <span>便捷支付 <strong>余额自动结算</strong></span
+            ><span>充电体验 <strong>随充随走</strong></span>
+          </div>
+          <button id="recharge-button">充值</button>
+        </div>
+        <div class="settings-list">
+          <button data-screen="orders">
+            <span class="setting-icon"
+              ><svg viewBox="0 0 24 24">
+                <path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" /></svg></span
+            ><b>充电记录</b><em>查看</em
+            ><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg></button
+          ><button>
+            <span class="setting-icon"
+              ><svg viewBox="0 0 24 24">
+                <path d="M4 7h16v12H4zM7 7V4h10v3M8 12h8" /></svg></span
+            ><b>我的车辆</b><em>待绑定</em
+            ><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg></button
+          ><button>
+            <span class="setting-icon"
+              ><svg viewBox="0 0 24 24">
+                <path
+                  d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7h.01"
+                /></svg></span
+            ><b>帮助与反馈</b><em></em
+            ><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+        </div>
+      </section>
+
+      <nav class="tab-bar" aria-label="底部导航">
+        <button class="active" data-screen="home">
+          <svg viewBox="0 0 24 24">
+            <path d="m3 10 9-7 9 7v11h-7v-7h-4v7H3z" /></svg
+          ><span>首页</span></button
+        ><button data-screen="map">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="m9 18-6 3V6l6-3 6 3 6-3v15l-6 3-6-3zM9 3v15M15 6v15"
+            /></svg
+          ><span>找桩</span></button
+        ><button data-screen="stats">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" /></svg
+          ><span>统计</span></button
+        ><button data-screen="profile">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21c1-5 3.5-7 8-7s7 2 8 7" /></svg
+          ><span>我的</span>
+        </button>
+      </nav>
+    </main>
+
+    <dialog id="login-dialog">
+      <button class="dialog-close" data-close aria-label="关闭">×</button
+      ><span class="dialog-mark"><i></i></span><small>YAOCHARGE ACCOUNT</small>
+      <h2>连接曜充账户</h2>
+      <p>使用手机号验证码登录，登录后可充值并发起真实的模拟充电订单。</p>
+      <label
+        >手机号<input
+          id="phone-input"
+          inputmode="tel"
+          maxlength="11"
+          value="13800138000"
+      /></label>
+      <div class="code-field">
+        <label
+          >验证码<input
+            id="code-input"
+            inputmode="numeric"
+            maxlength="6"
+            placeholder="6 位验证码" /></label
+        ><button id="send-code">获取验证码</button>
+      </div>
+      <button class="primary full" id="verify-code">登录</button
+      ><button class="demo-link" data-close>稍后登录</button>
+    </dialog>
+    <dialog id="recharge-dialog">
+      <button class="dialog-close" data-close aria-label="关闭">×</button
+      ><small>WALLET</small>
+      <h2>账户充值</h2>
+      <p>选择充值金额，充电完成后自动从余额结算。</p>
+      <div class="amount-grid">
+        <button>50</button><button class="active">100</button
+        ><button>200</button><button>500</button>
+      </div>
+      <button class="primary full" id="confirm-recharge">确认充值 ¥100</button>
+    </dialog>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="assets/leaflet.js"></script>
+    <script src="mobile.js?v=20260906-1"></script>
+    <script src="mobile-reference.js?v=20260906-1"></script>
+  </body>
+</html>

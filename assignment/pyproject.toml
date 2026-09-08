@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "charging-core"
+version = "0.1.0"
+description = "Minimal server-authoritative EV charging backend"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "asyncpg>=0.30,<1",
+  "fastapi>=0.116,<1",
+  "pydantic-settings>=2.10,<3",
+  "PyJWT>=2.10,<3",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+forecast = ["numpy>=2,<3"]
+
+[project.scripts]
+charging-core = "charging_core.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charging_core"]
+
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src", "/desktop", "/scripts", "/docs", "/README.md", "/ARCHITECTURE.md",
+  "/DEPLOYMENT.md", "/.env.example", "/pyproject.toml",
+]
+exclude = ["**/__pycache__", "**/*.pyc"]

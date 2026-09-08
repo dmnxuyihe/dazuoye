@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ELECTRA · 运营管理后台</title>
+    <link rel="stylesheet" href="admin.css" />
+    <link rel="stylesheet" href="admin-activity.css" />
+    <link rel="stylesheet" href="admin-forecast.css" />
+  </head>
+  <body>
+    <div class="console-shell">
+      <header class="topbar">
+        <a class="brand" href="admin.html"
+          ><span class="brand-mark">▰</span>ELECTRA</a
+        >
+        <nav aria-label="主导航">
+          <button data-page="dashboard" class="active">
+            <i data-icon="grid"></i>运营总览</button
+          ><button data-page="station"><i data-icon="plug"></i>站点导航</button
+          ><button data-page="trips"><i data-icon="car"></i>充电订单</button
+          ><button data-page="history">
+            <i data-icon="history"></i>操作审计
+          </button>
+          <button data-page="forecast"><i data-icon="bolt"></i>负荷预测</button>
+        </nav>
+        <div class="header-tools">
+          <button class="round" data-action="search" aria-label="搜索管理数据">
+            <i data-icon="search"></i>
+          </button>
+          <div class="tool-pair">
+            <button data-action="notifications" aria-label="通知">
+              <i data-icon="bell"></i><b class="notification-dot"></b></button
+            ><button data-action="settings" aria-label="设置">
+              <i data-icon="settings"></i>
+            </button>
+          </div>
+          <button class="avatar" data-action="account" aria-label="管理员账户">
+            A
+          </button>
+        </div>
+      </header>
+      <main>
+        <section id="page-dashboard" class="page active">
+          <div class="top-grid">
+            <article class="card vehicle-card">
+              <div class="card-heading">
+                <h2><i data-icon="bolt"></i>我的车辆</h2>
+                <select id="vehicle-select" aria-label="演示车型">
+                  <option value="Tesla M-3">特斯拉 Model 3</option>
+                  <option value="MG-4 Luxury">名爵 MG4 豪华版</option>
+                  <option value="BYD Seal">比亚迪海豹</option>
+                </select>
+              </div>
+              <div class="vehicle-art">
+                <img src="assets/admin-xray-car.png" alt="青色透视电动车" />
+                <div class="battery-cover">
+                  <strong>36<small>%</small></strong>
+                </div>
+              </div>
+              <div class="three-metrics">
+                <div>
+                  <strong>23<small> 分钟</small></strong
+                  ><span>预计充满</span>
+                </div>
+                <div>
+                  <strong>134<small> 公里</small></strong
+                  ><span>预计续航</span>
+                </div>
+                <div>
+                  <strong>$18<small> 美元</small></strong
+                  ><span>模拟费用</span>
+                </div>
+              </div>
+            </article>
+            <article class="card goal-card">
+              <div class="card-heading">
+                <h2><i data-icon="target"></i>充电目标</h2>
+                <select id="goal-period" aria-label="目标周期">
+                  <option value="today">今日</option>
+                  <option value="week">本周</option>
+                </select>
+              </div>
+              <div id="goal-chart" class="goal-chart"></div>
+              <div class="goal-legend">
+                <div>
+                  <strong id="daily-value">72<small>%</small></strong
+                  ><span><b></b>每日目标</span>
+                </div>
+                <div>
+                  <strong id="weekly-value">18<small>%</small></strong
+                  ><span><b></b>每周目标</span>
+                </div>
+              </div>
+            </article>
+            <article class="card planner-card">
+              <div class="card-heading">
+                <h2><i data-icon="car"></i>快捷路线规划</h2>
+                <button
+                  class="icon-button"
+                  data-action="planner"
+                  aria-label="路线设置"
+                >
+                  <i data-icon="sliders"></i>
+                </button>
+              </div>
+              <div class="route-map compact" id="quick-map">
+                <div class="map-layer"></div>
+                <div class="map-controls">
+                  <button data-map="center" aria-label="地图居中">◎</button
+                  ><button data-action="planner" aria-label="选择路线">♢</button
+                  ><button data-map="in" aria-label="放大">+</button
+                  ><button data-map="out" aria-label="缩小">−</button>
+                </div>
+                <div class="map-summary">
+                  <span>▥ 里程： <b id="route-distance">256</b> 英里</span
+                  ><span>◷ 用时： <b id="route-time">1.5</b> 小时</span>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div class="bottom-grid">
+            <article class="card statistic-card">
+              <div class="card-heading">
+                <h2><i data-icon="chart"></i>充电统计</h2>
+                <select id="stat-period" aria-label="统计周期">
+                  <option value="reference">本周</option>
+                  <option value="historical">UrbanEV</option>
+                </select>
+              </div>
+              <div class="stat-legend">
+                <span
+                  ><b class="pink">⌂</b>家庭
+                  <strong>38<small>%</small></strong></span
+                ><span
+                  ><b class="amber">▣</b>工作
+                  <strong>22<small>%</small></strong></span
+                ><span
+                  ><b class="violet">ϟ</b>其他
+                  <strong>43<small>%</small></strong></span
+                >
+              </div>
+              <div id="flow-chart"></div>
+            </article>
+            <article class="card station-list-card">
+              <div class="card-heading">
+                <h2><i data-icon="plug"></i>站点列表</h2>
+                <select id="station-filter" aria-label="站点筛选">
+                  <option value="all">全部站点</option>
+                  <option value="available">空闲站点</option>
+                </select>
+              </div>
+              <div class="list-column-head">
+                <span>站点位置</span><span>充电接口</span><span>营业时间</span
+                ><span>预约</span>
+              </div>
+              <div id="home-stations" class="station-list">
+                <p class="loading">正在连接充电网络…</p>
+              </div>
+            </article>
+          </div>
+        </section>
+        <section id="page-station" class="page">
+          <div class="station-layout">
+            <aside class="icon-rail">
+              <button
+                data-action="stations"
+                class="selected"
+                aria-label="站点管理"
+              >
+                <i data-icon="car"></i></button
+              ><button data-action="chargers" aria-label="电桩管理">
+                <i data-icon="plug"></i></button
+              ><button data-action="users" aria-label="用户管理">
+                <i data-icon="users"></i></button
+              ><button data-action="orders" aria-label="订单管理">
+                <i data-icon="history"></i></button
+              ><span></span
+              ><button data-action="settings" aria-label="设置">
+                <i data-icon="settings"></i>
+              </button>
+            </aside>
+            <article class="card vertical-vehicle">
+              <div class="card-heading">
+                <h2><i data-icon="bolt"></i>我的车辆</h2>
+                <span class="vehicle-name">特斯拉 Model 3</span>
+              </div>
+              <div class="vertical-art">
+                <div class="rotated-vehicle">
+                  <img src="assets/admin-xray-car.png" alt="车辆透视俯视图" />
+                  <div class="battery-cover">
+                    <strong>36<small>%</small></strong>
+                  </div>
+                </div>
+              </div>
+              <div class="three-metrics">
+                <div>
+                  <strong>36<small>%</small></strong
+                  ><span>当前电量</span>
+                </div>
+                <div>
+                  <strong>134<small> 公里</small></strong
+                  ><span>预计续航</span>
+                </div>
+                <div>
+                  <strong>67.6<small> kWh</small></strong
+                  ><span>电池容量</span>
+                </div>
+              </div>
+              <label class="charge-limit"
+                >充电上限：
+                <select id="charge-limit">
+                  <option value="70">70%</option>
+                  <option value="80">80%</option>
+                  <option value="100">100%</option>
+                </select></label
+              >
+            </article>
+            <article class="card navigation-card">
+              <div class="card-heading">
+                <h2><i data-icon="car"></i>站点导航</h2>
+                <button class="outline" data-action="stations">
+                  管理站点 ↗
+                </button>
+              </div>
+              <div class="route-map large" id="navigation-map">
+                <div class="map-layer"></div>
+                <div class="route-search">
+                  <label
+                    ><i data-icon="search"></i
+                    ><input
+                      id="nearby-search"
+                      placeholder="搜索附近充电站"
+                      aria-label="搜索附近站点"
+                  /></label>
+                  <div class="turn-instruction">
+                    <b>↱</b
+                    ><span
+                      ><strong id="turn-distance">650m</strong
+                      ><small id="turn-address">请选择充电站点</small></span
+                    >
+                  </div>
+                </div>
+                <div class="map-controls">
+                  <button data-map="center" aria-label="地图居中">◎</button
+                  ><button data-map="in" aria-label="放大">+</button
+                  ><button data-map="out" aria-label="缩小">−</button>
+                </div>
+                <div
+                  id="navigation-stations"
+                  class="station-list navigation-list"
+                ></div>
+              </div>
+            </article>
+          </div>
+        </section>
+        <section id="page-trips" class="page activity-page">
+          <div class="journey-grid">
+            <article class="card journey-card">
+              <div class="card-heading">
+                <h2><i data-icon="bolt"></i>充电行程</h2>
+                <span class="subtle-pill">路线示意</span>
+              </div>
+              <div id="session-journey"></div>
+            </article>
+            <article class="card mix-card">
+              <div class="card-heading">
+                <h2><i data-icon="target"></i>订单状态分布</h2>
+                <span class="subtle-pill">充电订单</span>
+              </div>
+              <div id="session-mix"></div>
+            </article>
+            <article class="card pulse-card">
+              <div class="card-heading">
+                <h2><i data-icon="chart"></i>充电能量趋势</h2>
+                <select id="pulse-days" aria-label="能量统计天数">
+                  <option value="7">近 7 天</option>
+                  <option value="30">近 30 天</option>
+                </select>
+              </div>
+              <div id="energy-pulse"></div>
+            </article>
+          </div>
+          <div class="session-lower">
+            <article class="card recent-card">
+              <div class="card-heading">
+                <h2><i data-icon="history"></i>最近充电订单</h2>
+                <button class="primary" data-action="book">＋ 新建订单</button>
+              </div>
+              <div class="activity-toolbar">
+                <div class="filter-pills" id="session-filters">
+                  <button class="active" data-session-filter="all">
+                    全部订单</button
+                  ><button data-session-filter="charging">充电中</button
+                  ><button data-session-filter="reserved">已预约</button
+                  ><button data-session-filter="completed">已完成</button
+                  ><button data-session-filter="cancelled">已取消</button>
+                </div>
+                <input
+                  id="session-search"
+                  placeholder="搜索站点或用户…"
+                  aria-label="搜索订单"
+                />
+              </div>
+              <div id="trips-table"></div>
+              <div class="activity-footnote">
+                最近 200 条订单 · 电量与结算金额由服务端计算
+              </div>
+            </article>
+            <aside class="session-aside">
+              <article class="card">
+                <div class="card-heading">
+                  <h2><i data-icon="chart"></i>订单概览</h2>
+                </div>
+                <div id="order-metrics" class="summary-list"></div>
+              </article>
+              <article class="card equipment-card">
+                <div class="card-heading">
+                  <h2><i data-icon="plug"></i>设备状态</h2>
+                </div>
+                <div id="charger-overview"></div>
+                <button class="primary" data-action="chargers">
+                  管理电桩 ↗
+                </button>
+              </article>
+            </aside>
+          </div>
+        </section>
+        <section id="page-history" class="page activity-page">
+          <div id="history-metrics" class="history-metrics"></div>
+          <div class="history-layout">
+            <article class="card timeline-card">
+              <div class="card-heading">
+                <h2><i data-icon="history"></i>操作时间线</h2>
+                <button class="outline" data-action="export-logs">
+                  导出 CSV ↗
+                </button>
+              </div>
+              <div class="activity-toolbar">
+                <select id="event-filter" aria-label="事件类型">
+                  <option value="all">全部事件</option>
+                  <option value="order">充电订单</option>
+                  <option value="wallet">钱包</option>
+                  <option value="charger">电桩</option>
+                  <option value="station">站点</option>
+                  <option value="user">用户</option>
+                  <option value="console">设置</option></select
+                ><input
+                  id="event-search"
+                  placeholder="搜索操作记录…"
+                  aria-label="搜索审计事件"
+                />
+              </div>
+              <div id="history-table"></div>
+              <div class="activity-footnote">
+                最近 200 条事件 · 事务审计记录 · UTC 时间
+              </div>
+            </article>
+            <aside class="history-insights">
+              <article class="card">
+                <div class="card-heading">
+                  <h2><i data-icon="target"></i>操作类型分布</h2>
+                </div>
+                <div id="operations-mix"></div>
+              </article>
+              <article class="card">
+                <div class="card-heading">
+                  <h2><i data-icon="grid"></i>操作活跃度</h2>
+                </div>
+                <div id="activity-heatmap"></div>
+              </article>
+              <article class="card">
+                <div class="card-heading">
+                  <h2><i data-icon="chart"></i>操作趋势</h2>
+                </div>
+                <div id="activity-bars"></div>
+              </article>
+              <article class="card event-detail-card">
+                <div class="card-heading">
+                  <h2><i data-icon="history"></i>事件详情</h2>
+                </div>
+                <div id="selected-event"></div>
+              </article>
+            </aside>
+          </div>
+        </section>
+        <section id="page-forecast" class="page">
+          <div class="forecast-heading">
+            <div>
+              <small>ENERGY INTELLIGENCE / 历史实验</small>
+              <h1>负荷预测</h1>
+              <p>从历史充电节律，观察未来 24 小时的能源需求。</p>
+            </div>
+            <label
+              >预测范围
+              <select id="forecast-scope" aria-label="预测区域">
+                <option value="all">全网 · 深圳</option>
+              </select></label
+            >
+          </div>
+          <div id="forecast-content" aria-live="polite">
+            <p>正在加载历史预测…</p>
+          </div>
+        </section>
+      </main>
+      <footer class="console-footer">
+        <span
+          ><b id="connection-dot"></b
+          ><span id="connection-label">正在连接…</span></span
+        ><span>车辆与目标为模拟展示 · 站点与订单来自数据库</span>
+        <div>
+          <button data-action="users">用户</button
+          ><button data-action="chargers">电桩</button
+          ><button data-action="orders">订单</button
+          ><a href="mobile.html">用户端 ↗</a><a href="dashboard.html">大屏 ↗</a>
+        </div>
+      </footer>
+    </div>
+    <dialog id="drawer" class="drawer">
+      <div class="drawer-header">
+        <div>
+          <small>ELECTRA / 运营管理</small>
+          <h2 id="drawer-title"></h2>
+        </div>
+        <button class="round" data-close="drawer" aria-label="关闭管理面板">
+          ×
+        </button>
+      </div>
+      <div id="drawer-content"></div>
+    </dialog>
+    <dialog id="editor" class="editor">
+      <div class="drawer-header">
+        <h2 id="editor-title"></h2>
+        <button class="round" data-close="editor" aria-label="关闭表单">
+          ×
+        </button>
+      </div>
+      <form id="edit-form">
+        <div id="form-fields"></div>
+        <p id="form-error" role="alert"></p>
+        <button class="primary" id="submit-edit" type="submit">保存修改</button>
+      </form>
+    </dialog>
+    <div id="toast" role="status"></div>
+    <script src="admin-activity.js"></script>
+    <script src="admin-forecast.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>

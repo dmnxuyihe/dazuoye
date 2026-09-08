@@ -1,0 +1,299 @@
+{
+  "dataset": {
+    "name": "UrbanEV",
+    "license": "CC0-1.0",
+    "source": "https://github.com/IntelligentSystemsLab/UrbanEV",
+    "period": "2022-09-01/2023-02-28",
+    "station_count": 1362,
+    "charger_count": 17532,
+    "coordinate_source": "GCJ-02",
+    "coordinate_storage": "WGS-84",
+    "source_sha256": {
+      "inf": "03c9830965e9e99b29adfb8cceed0eba98d37631f514273cb3fe61f80d63de7c",
+      "occupancy": "1b9099b8c6c33510a2c48a79c4b524b01f6a2f5df45b9d604361b22ad4bc5211",
+      "volume": "a55a095ce75af33c59aece2643d5d71b5cd5a0dc73bb97bc553f0a48f40ace32",
+      "e_price": "0076d03b8e400c3e911789e2c7ffb7dd0d44a4414247ead676b508def95bcef4",
+      "s_price": "d125783e042024157f38d1749232696ea2aa893c61fc31672a3c54374498d3dc"
+    }
+  },
+  "stations": [
+    {
+      "source_station_id": "1075",
+      "name": "宝安湾站",
+      "address": "深圳市 · UrbanEV 站点 1075",
+      "longitude": 113.833048,
+      "latitude": 22.628476,
+      "charger_count": 18,
+      "zone_id": 1031
+    },
+    {
+      "source_station_id": "1268",
+      "name": "前海枢纽站",
+      "address": "深圳市 · UrbanEV 站点 1268",
+      "longitude": 113.896072,
+      "latitude": 22.55391,
+      "charger_count": 4,
+      "zone_id": 316
+    },
+    {
+      "source_station_id": "1606",
+      "name": "福田中心站",
+      "address": "深圳市 · UrbanEV 站点 1606",
+      "longitude": 114.006032,
+      "latitude": 22.551481,
+      "charger_count": 12,
+      "zone_id": 1113
+    },
+    {
+      "source_station_id": "2068",
+      "name": "罗湖口岸站",
+      "address": "深圳市 · UrbanEV 站点 2068",
+      "longitude": 114.09386,
+      "latitude": 22.554797,
+      "charger_count": 3,
+      "zone_id": 1121
+    },
+    {
+      "source_station_id": "2406",
+      "name": "龙岗能源站",
+      "address": "深圳市 · UrbanEV 站点 2406",
+      "longitude": 114.195419,
+      "latitude": 22.643524,
+      "charger_count": 6,
+      "zone_id": 982
+    },
+    {
+      "source_station_id": "1362",
+      "name": "西乡站",
+      "address": "深圳市 · UrbanEV 站点 1362",
+      "longitude": 113.918809,
+      "latitude": 22.696854,
+      "charger_count": 20,
+      "zone_id": 647
+    },
+    {
+      "source_station_id": "2043",
+      "name": "坂田站",
+      "address": "深圳市 · UrbanEV 站点 2043",
+      "longitude": 114.081836,
+      "latitude": 22.700305,
+      "charger_count": 10,
+      "zone_id": 728
+    },
+    {
+      "source_station_id": "2555",
+      "name": "坪山站",
+      "address": "深圳市 · UrbanEV 站点 2555",
+      "longitude": 114.249034,
+      "latitude": 22.747489,
+      "charger_count": 12,
+      "zone_id": 849
+    },
+    {
+      "source_station_id": "1041",
+      "name": "空港新城站",
+      "address": "深圳市 · UrbanEV 站点 1041",
+      "longitude": 113.814504,
+      "latitude": 22.750882,
+      "charger_count": 12,
+      "zone_id": 585
+    },
+    {
+      "source_station_id": "1599",
+      "name": "龙华站",
+      "address": "深圳市 · UrbanEV 站点 1599",
+      "longitude": 113.999053,
+      "latitude": 22.638334,
+      "charger_count": 40,
+      "zone_id": 724
+    },
+    {
+      "source_station_id": "2426",
+      "name": "大运站",
+      "address": "深圳市 · UrbanEV 站点 2426",
+      "longitude": 114.211764,
+      "latitude": 22.753088,
+      "charger_count": 18,
+      "zone_id": 858
+    },
+    {
+      "source_station_id": "1176",
+      "name": "沙井站",
+      "address": "深圳市 · UrbanEV 站点 1176",
+      "longitude": 113.865393,
+      "latitude": 22.821888,
+      "charger_count": 20,
+      "zone_id": 568
+    }
+  ],
+  "hourly_profile": [
+    {
+      "hour": 0,
+      "occupancy_rate": 31.82,
+      "energy_kwh": 108268.18,
+      "electricity_price": 0.907,
+      "service_price": 0.76
+    },
+    {
+      "hour": 1,
+      "occupancy_rate": 33.32,
+      "energy_kwh": 110075.8,
+      "electricity_price": 0.899,
+      "service_price": 0.771
+    },
+    {
+      "hour": 2,
+      "occupancy_rate": 32.93,
+      "energy_kwh": 97475.03,
+      "electricity_price": 0.899,
+      "service_price": 0.771
+    },
+    {
+      "hour": 3,
+      "occupancy_rate": 32.64,
+      "energy_kwh": 91145.27,
+      "electricity_price": 0.899,
+      "service_price": 0.771
+    },
+    {
+      "hour": 4,
+      "occupancy_rate": 32.49,
+      "energy_kwh": 90455.09,
+      "electricity_price": 0.899,
+      "service_price": 0.771
+    },
+    {
+      "hour": 5,
+      "occupancy_rate": 32.56,
+      "energy_kwh": 92808.87,
+      "electricity_price": 0.899,
+      "service_price": 0.771
+    },
+    {
+      "hour": 6,
+      "occupancy_rate": 32.7,
+      "energy_kwh": 101644.47,
+      "electricity_price": 0.899,
+      "service_price": 0.771
+    },
+    {
+      "hour": 7,
+      "occupancy_rate": 31.96,
+      "energy_kwh": 101444.47,
+      "electricity_price": 0.915,
+      "service_price": 0.767
+    },
+    {
+      "hour": 8,
+      "occupancy_rate": 27.96,
+      "energy_kwh": 72516.56,
+      "electricity_price": 0.948,
+      "service_price": 0.755
+    },
+    {
+      "hour": 9,
+      "occupancy_rate": 25.88,
+      "energy_kwh": 56342.3,
+      "electricity_price": 0.97,
+      "service_price": 0.726
+    },
+    {
+      "hour": 10,
+      "occupancy_rate": 24.96,
+      "energy_kwh": 47606.29,
+      "electricity_price": 0.995,
+      "service_price": 0.702
+    },
+    {
+      "hour": 11,
+      "occupancy_rate": 24.26,
+      "energy_kwh": 45878.99,
+      "electricity_price": 1.0,
+      "service_price": 0.687
+    },
+    {
+      "hour": 12,
+      "occupancy_rate": 24.4,
+      "energy_kwh": 65880.56,
+      "electricity_price": 0.964,
+      "service_price": 0.742
+    },
+    {
+      "hour": 13,
+      "occupancy_rate": 25.23,
+      "energy_kwh": 68349.58,
+      "electricity_price": 0.958,
+      "service_price": 0.751
+    },
+    {
+      "hour": 14,
+      "occupancy_rate": 24.03,
+      "energy_kwh": 52901.58,
+      "electricity_price": 0.994,
+      "service_price": 0.704
+    },
+    {
+      "hour": 15,
+      "occupancy_rate": 23.32,
+      "energy_kwh": 50338.22,
+      "electricity_price": 1.002,
+      "service_price": 0.691
+    },
+    {
+      "hour": 16,
+      "occupancy_rate": 23.33,
+      "energy_kwh": 51934.72,
+      "electricity_price": 1.002,
+      "service_price": 0.691
+    },
+    {
+      "hour": 17,
+      "occupancy_rate": 23.37,
+      "energy_kwh": 55334.66,
+      "electricity_price": 0.986,
+      "service_price": 0.709
+    },
+    {
+      "hour": 18,
+      "occupancy_rate": 23.84,
+      "energy_kwh": 55061.79,
+      "electricity_price": 0.986,
+      "service_price": 0.707
+    },
+    {
+      "hour": 19,
+      "occupancy_rate": 25.11,
+      "energy_kwh": 57951.44,
+      "electricity_price": 0.976,
+      "service_price": 0.697
+    },
+    {
+      "hour": 20,
+      "occupancy_rate": 27.36,
+      "energy_kwh": 60388.37,
+      "electricity_price": 0.972,
+      "service_price": 0.697
+    },
+    {
+      "hour": 21,
+      "occupancy_rate": 28.63,
+      "energy_kwh": 60843.57,
+      "electricity_price": 0.96,
+      "service_price": 0.693
+    },
+    {
+      "hour": 22,
+      "occupancy_rate": 29.82,
+      "energy_kwh": 62016.79,
+      "electricity_price": 0.958,
+      "service_price": 0.692
+    },
+    {
+      "hour": 23,
+      "occupancy_rate": 30.67,
+      "energy_kwh": 65176.19,
+      "electricity_price": 0.941,
+      "service_price": 0.709
+    }
+  ]
+}

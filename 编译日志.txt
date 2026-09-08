@@ -1,0 +1,15 @@
+[1/15] Automatic MOC for target electra_common
+[2/15] Building CXX object CMakeFiles/electra_common.dir/src/client.cpp.o
+[3/15] Building CXX object CMakeFiles/electra_common.dir/electra_common_autogen/mocs_compilation.cpp.o
+[4/15] Building CXX object CMakeFiles/electra_common.dir/src/ui.cpp.o
+[5/15] Linking CXX static library libelectra_common.a
+[6/15] Automatic MOC for target electra-admin
+[7/15] Automatic MOC for target electra-user
+[8/15] Building CXX object CMakeFiles/electra-user.dir/electra-user_autogen/mocs_compilation.cpp.o
+[9/15] Building CXX object CMakeFiles/electra-user.dir/src/user_main.cpp.o
+[10/15] Building CXX object CMakeFiles/electra-admin.dir/electra-admin_autogen/mocs_compilation.cpp.o
+[11/15] Building CXX object CMakeFiles/electra-admin.dir/src/admin_main.cpp.o
+[12/15] Building CXX object CMakeFiles/electra-user.dir/src/user_window.cpp.o
+[13/15] Linking CXX executable electra-user
+[14/15] Building CXX object CMakeFiles/electra-admin.dir/src/admin_window.cpp.o
+[15/15] Linking CXX executable electra-admin

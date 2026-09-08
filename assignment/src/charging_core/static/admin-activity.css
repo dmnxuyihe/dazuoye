@@ -1,0 +1,892 @@
+.activity-page .card-heading h2 {
+  font-size: 17px;
+}
+.activity-page .card-heading {
+  padding: 15px 17px;
+}
+.subtle-pill {
+  font-size: 10px;
+  border: 1px solid #654c79;
+  border-radius: 20px;
+  padding: 4px 10px;
+  color: #ccb5df;
+  white-space: nowrap;
+}
+.journey-grid {
+  display: grid;
+  grid-template-columns: 1.22fr 0.95fr 1.05fr;
+  gap: 9px;
+}
+.journey-grid > .card {
+  min-height: 320px;
+}
+.journey-map {
+  height: 200px;
+  position: relative;
+  background: radial-gradient(ellipse at 45% 60%, #39204766, transparent);
+}
+.journey-map > svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+.journey-map > img {
+  position: absolute;
+  left: -29px;
+  top: 49px;
+  width: 170px;
+  transform: rotate(-9deg);
+  filter: drop-shadow(0 0 12px #32d6ed28);
+}
+.journey-origin,
+.journey-destination {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+}
+.journey-origin {
+  left: 24%;
+  top: 31%;
+}
+.journey-destination {
+  right: 8%;
+  bottom: 8%;
+  text-align: right;
+}
+.journey-map strong {
+  font-size: 12px;
+}
+.journey-map small {
+  font-size: 9px;
+  color: #bd9ecb;
+  margin-top: 3px;
+}
+.journey-values {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 13px 16px;
+  border-top: 1px solid #362242;
+}
+.journey-values > div {
+  padding-left: 8px;
+}
+.journey-values > div + div {
+  border-left: 1px solid #372147;
+}
+.journey-values small,
+.pulse-values small {
+  display: block;
+  color: #a58db9;
+  font-size: 9px;
+  margin-bottom: 5px;
+}
+.journey-values strong {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.activity-page em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 400;
+}
+.insight-donut {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 14px 13px;
+  min-height: 205px;
+}
+.insight-donut > svg {
+  width: 56%;
+  min-width: 0;
+}
+.donut-key {
+  flex: 1;
+}
+.donut-key > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 10px;
+  margin: 13px 0;
+}
+.donut-key i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.donut-key span {
+  flex: 1;
+}
+.donut-key small {
+  display: block;
+  color: #947fa7;
+  font-size: 8px;
+  margin-top: 4px;
+}
+.donut-key b {
+  font-size: 10px;
+}
+.pulse-card #energy-pulse {
+  padding: 0 13px;
+}
+.pulse-card #energy-pulse svg {
+  width: 100%;
+  height: 177px;
+  display: block;
+}
+.pulse-values {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 9px 0;
+}
+.pulse-values strong {
+  font-size: 14px;
+}
+.chart-caption {
+  color: #9e85b4;
+  font-size: 9px;
+  text-align: center;
+  margin: 10px 0;
+}
+.session-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 2.35fr) minmax(250px, 1fr);
+  gap: 9px;
+  margin-top: 9px;
+}
+.recent-card {
+  min-height: 475px;
+}
+.activity-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 17px 16px;
+  flex-wrap: wrap;
+}
+.activity-toolbar input {
+  border-radius: 8px;
+  background: #20132e;
+  min-width: 130px;
+  flex: 1;
+  width: 100px;
+}
+.filter-pills {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.filter-pills button {
+  font-size: 9px;
+  color: #b8a2c9;
+  border: 1px solid #3a254d;
+  border-radius: 14px;
+  padding: 5px 9px;
+}
+.filter-pills button.active {
+  background: linear-gradient(#532e75, #301c49);
+  color: #f5dcff;
+  border-color: #a86bd0;
+}
+.activity-page .data-table th {
+  font-size: 9px;
+  padding: 8px 10px;
+}
+.activity-page .data-table td {
+  font-size: 11px;
+  padding: 13px 10px;
+}
+.activity-page .data-table tbody tr:nth-child(odd) {
+  background: #2b1c3b66;
+}
+.activity-page .data-table tbody tr:hover {
+  background: #3b24504d;
+}
+.activity-page .data-table td:first-child {
+  min-width: 175px;
+}
+.session-identity {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.session-identity .station-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+}
+.session-identity strong {
+  font-size: 12px;
+  display: block;
+}
+.session-identity small {
+  display: block;
+  font-size: 9px;
+  color: #a18bab;
+  margin-top: 4px;
+}
+.mini-journey {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 110px;
+  padding: 6px 0;
+}
+.mini-journey span,
+.mini-journey b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #593674;
+  color: #dab4ec;
+}
+.mini-journey b {
+  background: linear-gradient(#a565df, #62358e);
+  color: #f9e9ff;
+}
+.mini-journey i {
+  flex: 1;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #c477c5 0 3px,
+    transparent 3px 6px
+  );
+  box-shadow: 0 0 7px #e871cd3b;
+}
+.connector-caption {
+  color: #a58caf;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.unit-caption {
+  display: block;
+  color: #a68db6;
+  font-size: 9px;
+  margin-top: 3px;
+}
+.activity-page .table-actions button {
+  font-size: 9px;
+  padding: 3px 6px;
+}
+.activity-page .table-actions {
+  max-width: 110px;
+}
+.activity-footnote {
+  font-size: 9px;
+  color: #8e779f;
+  padding: 17px;
+  text-align: center;
+  border-top: 1px solid #36213e;
+}
+.session-aside {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 1fr 1fr;
+}
+.session-aside .card-heading {
+  padding: 15px 12px;
+}
+.session-aside .card-heading h2 {
+  font-size: 12px;
+  gap: 5px;
+  white-space: normal;
+}
+.session-aside .card-heading h2 > i {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.session-aside .icon {
+  width: 16px;
+}
+.summary-list {
+  padding: 0 14px;
+}
+.summary-list > div {
+  padding: 18px 0;
+  border-bottom: 1px solid #3c27474d;
+}
+.summary-list span {
+  display: block;
+  color: #b6a1c7;
+  font-size: 10px;
+}
+.summary-list strong {
+  font-size: 16px;
+  display: block;
+  margin-top: 7px;
+}
+.equipment-card {
+  padding-bottom: 15px;
+}
+.device-indicator {
+  color: #93d6a7;
+  text-align: center;
+  font-size: 9px;
+  padding: 4px 10px;
+}
+.device-indicator > span {
+  display: block;
+  border: 1px solid #70c699;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 25px;
+  margin: 0 auto 12px;
+  box-shadow: 0 0 22px #81e4a91c;
+}
+.device-capacity {
+  text-align: center;
+  margin: 26px 0 20px;
+}
+.device-capacity > strong {
+  font-size: 29px;
+  display: block;
+}
+.device-capacity small {
+  font-size: 12px;
+  color: #b8a0cd;
+}
+.device-capacity > span {
+  font-size: 9px;
+  color: #b49cc5;
+}
+.capacity-track {
+  height: 4px;
+  background: #3a2550;
+  border-radius: 5px;
+  margin: 0 14px;
+}
+.capacity-track i {
+  height: 100%;
+  display: block;
+  background: linear-gradient(90deg, #4bafc2, #92d9b7);
+  border-radius: 5px;
+}
+.device-breakdown {
+  padding: 14px;
+  font-size: 9px;
+  color: #b49cc5;
+  display: grid;
+  gap: 15px;
+}
+.device-breakdown b {
+  float: right;
+  color: #f4e4ff;
+}
+.equipment-card > .primary {
+  font-size: 10px;
+  width: calc(100% - 22px);
+  margin: 17px 11px 0;
+  padding: 8px 4px;
+}
+.history-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin-bottom: 9px;
+}
+.history-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 19px 21px;
+  gap: 15px;
+}
+.history-metric small {
+  font-size: 11px;
+  color: #c2aed0;
+}
+.history-metric strong {
+  font-size: 27px;
+  display: block;
+  margin: 3px 0;
+}
+.history-metric span {
+  font-size: 9px;
+  color: #9e88b1;
+}
+.history-metric svg {
+  width: 42%;
+  height: 55px;
+  align-self: flex-end;
+}
+.history-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 9px;
+}
+.timeline-card {
+  min-height: 680px;
+}
+.history-insights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  grid-template-rows: 285px minmax(365px, auto);
+}
+.history-insights .card-heading h2 {
+  font-size: 14px;
+}
+.history-insights .insight-donut {
+  min-height: 190px;
+  padding: 7px 12px;
+}
+.history-insights .card-heading {
+  padding: 13px;
+}
+.history-insights .card-heading i {
+  width: 28px;
+  height: 28px;
+}
+.timeline-date {
+  padding: 7px 20px;
+  color: #a18bae;
+  font-size: 10px;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+.timeline-date > span {
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, #51325f, transparent);
+}
+.timeline-event {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  position: relative;
+  text-align: left;
+  padding: 15px 16px;
+  border-bottom: 1px solid #39214355;
+}
+.timeline-event:nth-child(even) {
+  background: #28193560;
+}
+.timeline-event.selected {
+  background: linear-gradient(90deg, #46245880, #26153644);
+  box-shadow: inset 2px 0 #d083df;
+}
+.timeline-event time {
+  font-size: 10px;
+  color: #c1aad0;
+  width: 41px;
+  flex-shrink: 0;
+}
+.event-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(150deg, #b86df0, #7541b0);
+  box-shadow: 0 0 18px #9f4dd128;
+  font-size: 17px;
+  z-index: 1;
+}
+.event-node.wallet {
+  background: linear-gradient(#e78bcd, #b747a4);
+}
+.event-node.charger {
+  background: linear-gradient(#eed078, #d19432);
+}
+.event-node.station,
+.event-node.user {
+  background: linear-gradient(#79c6d3, #458eaa);
+}
+.timeline-event:before {
+  content: "";
+  position: absolute;
+  left: 84px;
+  top: -10px;
+  bottom: -10px;
+  width: 1px;
+  background: #61397677;
+}
+.event-copy {
+  flex: 1;
+  min-width: 0;
+}
+.event-copy strong {
+  font-size: 12px;
+  display: block;
+}
+.event-copy small {
+  font-size: 9px;
+  color: #b59cc4;
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.event-meta {
+  color: #ddd0e6;
+  font-size: 10px;
+  text-align: right;
+  max-width: 120px;
+  overflow-wrap: anywhere;
+}
+.event-meta small {
+  display: block;
+  font-size: 9px;
+  color: #9981ab;
+  margin-top: 6px;
+}
+.event-arrow {
+  font-size: 16px;
+  color: #ab89bf;
+}
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 24px repeat(12, 1fr);
+  gap: 3px;
+  margin: 22px 14px 0;
+  align-items: center;
+}
+.heatmap-grid > span {
+  font-size: 8px;
+  color: #b49cc9;
+}
+.heatmap-grid > b {
+  height: 13px;
+  border-radius: 2px;
+  border: 1px solid #54336833;
+}
+.heatmap-hours {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 14px 0 42px;
+  color: #987bad;
+  font-size: 8px;
+}
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 20px 14px;
+  color: #ad92c2;
+  font-size: 8px;
+  flex-wrap: wrap;
+}
+.heatmap-legend i {
+  height: 7px;
+  width: 65px;
+  background: linear-gradient(90deg, #342044, #c584ef);
+}
+.heatmap-legend > span {
+  margin-left: auto;
+}
+#activity-bars {
+  padding: 13px;
+}
+#activity-bars svg {
+  width: 100%;
+  height: 230px;
+}
+.event-detail-title {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 15px;
+}
+.event-detail-title strong {
+  font-size: 12px;
+}
+.event-detail-title small {
+  display: block;
+  font-size: 9px;
+  color: #b296c6;
+  margin-top: 5px;
+}
+.event-detail-card dl {
+  padding: 0 15px;
+  font-size: 10px;
+}
+.event-detail-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #39244555;
+}
+.event-detail-card dt {
+  color: #a68db7;
+  min-width: 50px;
+}
+.event-detail-card dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  max-width: 155px;
+}
+.event-detail-card .outline {
+  margin: 10px 15px 16px;
+  width: calc(100% - 30px);
+}
+#history-table {
+  max-height: 620px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #744791 transparent;
+}
+#trips-table {
+  max-height: 460px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #744791 transparent;
+}
+.activity-page .primary {
+  padding: 8px 13px;
+  font-size: 11px;
+}
+@media (min-width: 1600px) {
+  .journey-grid > .card {
+    min-height: 365px;
+  }
+  .journey-map {
+    height: 239px;
+  }
+  .pulse-card #energy-pulse svg {
+    height: 218px;
+  }
+  .insight-donut {
+    padding-top: 20px;
+  }
+  .session-lower {
+    grid-template-columns: 2.2fr 1fr;
+  }
+  .recent-card {
+    min-height: 470px;
+  }
+  .summary-list > div {
+    padding: 20px 0;
+  }
+  .history-layout {
+    grid-template-columns: 1.15fr 1fr;
+  }
+  .timeline-event {
+    padding: 20px;
+  }
+  .history-insights {
+    grid-template-rows: 300px minmax(380px, auto);
+  }
+}
+@media (max-width: 1200px) {
+  .journey-grid {
+    grid-template-columns: 1.1fr 1fr;
+  }
+  .pulse-card {
+    grid-column: 1/-1;
+    min-height: 230px !important;
+  }
+  .pulse-card #energy-pulse {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+  }
+  .pulse-card #energy-pulse svg {
+    height: 150px;
+  }
+  .pulse-values {
+    align-items: center;
+  }
+  .pulse-card .chart-caption {
+    grid-column: 1/-1;
+  }
+  .session-lower {
+    grid-template-columns: 1fr;
+  }
+  .session-aside {
+    grid-template-columns: 1fr 1fr;
+  }
+  .summary-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0 15px;
+  }
+  .device-capacity {
+    margin: 10px;
+  }
+  .device-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .device-indicator > span {
+    margin: 0;
+  }
+  .device-breakdown {
+    display: flex;
+    justify-content: space-between;
+  }
+  .device-breakdown b {
+    float: none;
+    margin-left: 10px;
+  }
+  .history-layout {
+    grid-template-columns: 1fr;
+  }
+  .history-insights {
+    grid-template-rows: auto;
+    grid-template-columns: 1fr 1fr;
+  }
+  .timeline-card {
+    min-height: 0;
+  }
+  .event-meta {
+    max-width: 190px;
+  }
+  .history-insights .insight-donut {
+    max-width: 390px;
+    margin: auto;
+  }
+  .history-insights .heatmap-grid {
+    margin-top: 30px;
+  }
+  .heatmap-grid > b {
+    height: 18px;
+  }
+  .history-metric {
+    padding: 15px;
+  }
+}
+@media (max-width: 760px) {
+  .journey-grid {
+    grid-template-columns: 1fr;
+  }
+  .journey-grid > .card {
+    min-height: 310px;
+  }
+  .pulse-card {
+    grid-column: auto;
+  }
+  .pulse-card #energy-pulse {
+    display: block;
+  }
+  .pulse-card #energy-pulse svg {
+    height: 170px;
+  }
+  .history-metrics {
+    grid-template-columns: 1fr;
+  }
+  .history-metric {
+    padding: 13px 20px;
+  }
+  .history-metric strong {
+    font-size: 22px;
+  }
+  .history-metric svg {
+    height: 40px;
+    width: 38%;
+  }
+  .history-insights {
+    grid-template-columns: 1fr;
+  }
+  .session-aside {
+    grid-template-columns: 1fr;
+  }
+  .activity-page .card-heading h2 {
+    font-size: 15px;
+  }
+  .activity-page .data-table {
+    min-width: 740px;
+  }
+  .timeline-event {
+    padding: 14px 10px;
+    gap: 8px;
+  }
+  .timeline-event time {
+    width: 31px;
+    font-size: 9px;
+  }
+  .timeline-event:before {
+    left: 65px;
+  }
+  .event-node {
+    width: 28px;
+    height: 28px;
+  }
+  .event-copy strong {
+    font-size: 11px;
+  }
+  .event-copy small {
+    font-size: 8px;
+  }
+  .event-meta {
+    max-width: 65px;
+    font-size: 9px;
+  }
+  .event-arrow {
+    display: none;
+  }
+  .event-detail-card dd {
+    max-width: 230px;
+  }
+  .filter-pills button {
+    font-size: 9px;
+  }
+  .activity-toolbar {
+    padding: 0 12px 12px;
+  }
+  .journey-values strong {
+    font-size: 10px;
+  }
+  .journey-destination {
+    right: 5%;
+    max-width: 150px;
+  }
+  .journey-values {
+    padding: 12px 8px;
+  }
+  .insight-donut {
+    max-width: 390px;
+    margin: auto;
+  }
+  .equipment-card {
+    min-height: 260px;
+  }
+  #history-table {
+    max-height: 550px;
+  }
+  .recent-card {
+    min-height: 320px;
+  }
+}
+
+@media (min-width: 1201px) {
+  #trips-table {
+    max-height: 330px;
+  }
+  #history-table {
+    max-height: 410px;
+  }
+  .history-insights {
+    grid-template-rows: 270px minmax(310px, auto);
+  }
+  .timeline-card {
+    min-height: 590px;
+  }
+  .session-lower {
+    min-height: 455px;
+  }
+  .recent-card {
+    min-height: 455px;
+  }
+  .summary-list > div {
+    padding: 15px 0;
+  }
+  #activity-bars svg {
+    height: 190px;
+  }
+}

@@ -1,0 +1,11 @@
+Electra Windows 免安装运行包
+
+1. 双击“启动管理员端.bat”运行管理端。
+2. 双击“启动用户端.bat”运行用户端。
+3. 已内置 Qt 6.5.3、MinGW 运行库和必要插件，无需配置 Qt 或 PATH。
+4. 启动脚本默认连接项目公网 API：
+   https://lv-l40s-liuzihang.taild6df1c.ts.net:8443
+5. 如需连接本地后端，可在命令行执行：
+   electra-admin.exe --api http://127.0.0.1:4173
+   electra-user.exe --api http://127.0.0.1:4173
+

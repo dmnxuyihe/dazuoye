@@ -1,0 +1,20 @@
+# Local IDE metadata and generated build trees
+**/.qtcreator/
+**/build/
+**/build-*/
+**/cmake-build-*/
+
+# Python local environments and caches
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+
+# Local secrets (keep documented examples)
+**/.env
+!**/.env.example
+
+# Common operating-system files
+.DS_Store
+Thumbs.db
