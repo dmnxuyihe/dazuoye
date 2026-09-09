@@ -25,3 +25,6 @@ Thumbs.db
 *.sqlite-shm
 .env.*
 !.env.example
+desktop\scripts\run-windows.cmd
+run-admin.cmd
+run-user.cmd

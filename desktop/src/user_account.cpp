@@ -347,6 +347,7 @@ void UserWindow::history() {
             api->get("/orders/" + text(o, "id"), this, [this](const Reply &r) {
                 if (r.ok) {
                     active = r.data.object();
+                    chargingOrigin = "history";
                     navigate("charging");
                 } else
                     message(r);

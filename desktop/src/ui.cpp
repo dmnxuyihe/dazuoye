@@ -284,7 +284,8 @@ void applyTheme(QApplication &app) {
     installDialogPolicy(app);
     app.setFont(QFont(QFontDatabase::applicationFontFamilies(fontId).value(0, "Noto Sans SC"), 10));
     app.setStyleSheet(R"(
-QMainWindow,QDialog { background:#100a1a; color:#f6edff; }
+QMainWindow { background:#100a1a; color:#f6edff; }
+QDialog { color:#f6edff; }
 QWidget { color:#eee4f8; font-size:13px; }
 QWidget#canvas {background:qradialgradient(cx:.4,cy:0,radius:1,fx:.4,fy:0,stop:0 #583456,stop:.65 #100a1a);}
 QWidget#root {background:#100b1b;border:3px solid #4b3d57;border-radius:28px;}

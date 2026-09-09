@@ -168,37 +168,50 @@ void UserWindow::stationPage() {
 
 }
 void UserWindow::charging() {
-    body->addWidget(pageHeading("充电中枢", this, [this] { navigate("home"); }));
+    body->addWidget(pageHeading("充电中枢", this, [this] { navigate(chargingOrigin); }));
     QVBoxLayout *l;
-    auto box = card(active.isEmpty() ? "车辆待充电" : text(active, "status") == "pending_payment" ? "充电账单 · 待支付" : text(active, "station_name"), &l);
+    const auto chargingTitle = text(active,"station_name") + " · 电桩 " + text(active,"charger_code");
+    auto box = card(active.isEmpty() ? "车辆待充电" : text(active, "status") == "pending_payment" ? "充电账单 · 待支付" : chargingTitle, &l);
     box->setStyleSheet(
         "QFrame#card{background:qradialgradient(cx:.5,cy:.4,radius:.8,fx:.5,fy:.4,stop:0 "
         "#36155d,stop:.6 #26113f,stop:1 #1b112b);border:1px solid #50325f;border-radius:24px;}");
-    l->setContentsMargins(17, 20, 17, 20);
-    l->setSpacing(14);
+    l->setContentsMargins(17, 14, 17, 14);
+    l->setSpacing(9);
     auto ring = new ArtWidget(ArtWidget::Ring);
     ring->setFixedHeight(260);
     batteryArt = ring;
     ring->setValue(batterySoc(), "模拟车辆电量");
     l->addWidget(ring);
+    l->addStretch(1);
     if (active.isEmpty()) {
         l->addWidget(label("尚未连接充电桩", muted));
         l->addWidget(button("寻找充电站", this, [this] { navigate("map"); }, true));
     } else {
         chargeState = label(statusText(text(active, "status")), "font-size:18px;color:#e8a7e0;");
         l->addWidget(chargeState);
-        chargeEnergy = label(money(number(active, "energy_kwh")) + " kWh", "font-size:22px;");
-        chargeCost = label("¥" + money(number(active, "amount")), "font-size:22px;");
+        const auto energyText=money(number(active, "energy_kwh")) + " kWh";
+        const auto costText="¥" + money(number(active, "amount"));
+        const auto valueStyle=[](const QString &value) {
+            return QString("font-size:%1px;").arg(value.size()>10?14:value.size()>8?16:18);
+        };
+        chargeEnergy = label(energyText, valueStyle(energyText));
+        chargeCost = label(costText, valueStyle(costText));
+        chargeTime = label("—", "font-size:18px;");
+        for (auto value : {chargeEnergy.data(),chargeCost.data(),chargeTime.data()}) {
+            value->setMinimumWidth(0);
+            value->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+        }
         auto metrics=new QFrame;metrics->setObjectName("charge-metrics");
         metrics->setStyleSheet("QFrame#charge-metrics{background:#21152f;border:1px solid #604074;border-radius:12px;}");
         auto grid=new QGridLayout(metrics);grid->setContentsMargins(14,12,14,12);
-        grid->addWidget(label("订单电量",muted),0,0);grid->addWidget(label("账单费用",muted),0,1);
-        grid->addWidget(chargeEnergy,1,0);grid->addWidget(chargeCost,1,1);
+        for(int column=0;column<3;++column)grid->setColumnStretch(column,1);
+        grid->addWidget(label("订单电量",muted),0,0);grid->addWidget(label("账单费用",muted),0,1);grid->addWidget(label("预计剩余",muted),0,2);
+        grid->addWidget(chargeEnergy,1,0);grid->addWidget(chargeCost,1,1);grid->addWidget(chargeTime,1,2);
         l->addWidget(metrics);
+        l->addStretch(1);
         l->addWidget(label("电桩 " + text(active, "charger_code") + " · " +
             QString::number(number(active, "power_kw")) + " kW · 按预约时分时价格计费", muted));
-        chargeTime = label("");
-        l->addWidget(chargeTime);
+        l->addStretch(1);
         l->addWidget(button("查看分时账单明细", this, [this]{showDetail(this,"账单明细",{{"分时计费",active.value("billing_detail")}});}));
         auto s = text(active, "status");
         if (s == "reserved") {
@@ -214,9 +227,9 @@ void UserWindow::charging() {
         else
             l->addWidget(button("查看订单历史", this, [this] { navigate("history"); }));
     }
-    body->addWidget(box);
+    box->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
+    body->addWidget(box,1);
     updateCharging();
-    body->addWidget(label("订单电量按服务端功率与时间模拟，费用与状态以服务端为准。", muted));
 }
 void UserWindow::orderCommand(const QString &action) {
     if (active.isEmpty())

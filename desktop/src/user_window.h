@@ -29,6 +29,7 @@ class UserWindow : public DesktopWindow {
     QString selectedStation;
     int statsPeriod = 0, tariffMode = 0, historyFilter = 0, walletFilter = 0;
     QString scheduleOrigin = "stats";
+    QString chargingOrigin = "home";
     QJsonObject historyData;
     ApiClient *historyApi;
     QWidget *footerBar;

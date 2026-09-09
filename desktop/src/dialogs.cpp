@@ -80,13 +80,11 @@ void prepareContent(QDialog *dialog, int width) {
 void fitDialog(QDialog *dialog) {
     const auto bounds = dialogBounds(dialog);
     if (bounds.isEmpty()) return;
-    prepareContent(dialog, bounds.width());
+    const QSize target(qMax(240, qRound(bounds.width() * DialogAppearance::WidthRatio)),
+                       qMax(220, qRound(bounds.height() * DialogAppearance::HeightRatio)));
+    prepareContent(dialog, target.width());
     if (dialog->layout()) dialog->layout()->setSizeConstraint(QLayout::SetNoConstraint);
-    dialog->setMinimumSize(0, 0);
-    const QSize decorations = dialog->frameGeometry().size() - dialog->size();
-    const auto maximum = bounds.size() - decorations;
-    dialog->setMaximumSize(maximum);
-    dialog->resize(dialog->size().boundedTo(maximum));
+    dialog->setFixedSize(target.boundedTo(bounds.size()));
     if (dialog->layout()) dialog->layout()->activate();
     dialog->move(dialog->pos() + bounds.center() - dialog->frameGeometry().center());
 }
@@ -97,6 +95,12 @@ class DialogPolicy : public QObject {
     bool eventFilter(QObject *object, QEvent *event) override {
         if (event->type() == QEvent::Show) {
             if (auto dialog = qobject_cast<QDialog *>(object)) {
+                dialog->setStyleSheet(dialog->styleSheet() + QString(
+                    "QDialog{background:%1;border:%2px solid %3;border-radius:%4px;}")
+                    .arg(DialogAppearance::BackgroundColor)
+                    .arg(DialogAppearance::BorderWidth)
+                    .arg(DialogAppearance::BorderColor)
+                    .arg(DialogAppearance::CornerRadius));
                 // Run after the platform's default placement, including modal exec() dialogs.
                 QTimer::singleShot(0, dialog, [dialog] { fitDialog(dialog); });
             }

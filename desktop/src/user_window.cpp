@@ -184,6 +184,11 @@ void UserWindow::refresh() {
 }
 void UserWindow::navigate(const QString &page) {
     if (page == "schedule" && current != "schedule") scheduleOrigin = current;
+    if (page == "charging" && current != "charging")
+        chargingOrigin = current == "history" ? "history" : "home";
+    auto pageScroll = root->findChild<QScrollArea *>("page-scroll");
+    const bool samePage = current == page;
+    const int previousScroll = pageScroll ? pageScroll->verticalScrollBar()->value() : 0;
     current = page;
     footerBar->setVisible(true);
     for (auto b : root->findChildren<QPushButton *>())
@@ -217,6 +222,17 @@ void UserWindow::navigate(const QString &page) {
     else
         home();
     body->addStretch();
+    if (pageScroll) {
+        pageScroll->setVerticalScrollBarPolicy(page == "charging" ? Qt::ScrollBarAlwaysOff
+                                                                   : Qt::ScrollBarAsNeeded);
+        pageScroll->verticalScrollBar()->setEnabled(page != "charging");
+        if (samePage)
+            QTimer::singleShot(0,pageScroll,[pageScroll,previousScroll]{
+                pageScroll->verticalScrollBar()->setValue(previousScroll);
+            });
+        else
+            pageScroll->verticalScrollBar()->setValue(0);
+    }
 }
 double UserWindow::batterySoc() const {
     const auto s=text(active,"status");
@@ -241,13 +257,16 @@ void UserWindow::updateCharging() {
         if (s == "reserved") {
             auto until = QDateTime::fromString(text(active, "reserved_until"), Qt::ISODateWithMs);
             auto seconds = qMax<qint64>(0, QDateTime::currentDateTimeUtc().secsTo(until));
-            chargeTime->setText(QString("预约剩余 %1分%2秒").arg(seconds / 60).arg(seconds % 60));
+            chargeTime->setText(QString("%1分%2秒").arg(seconds / 60).arg(seconds % 60));
         } else if (s == "charging" && number(active, "target_energy_kwh") > 0) {
             double remaining = qMax(0., number(active, "target_energy_kwh") - number(active, "energy_kwh"));
             double seconds = remaining * 3600 / qMax(1., number(active, "power_kw")) /
                 qMax(1., number(active, "time_scale"));
-            chargeTime->setText(QString("预计 %1分%2秒后达到上限（模拟时间）")
+            chargeTime->setText(QString("%1分%2秒")
                 .arg(int(seconds) / 60).arg(int(seconds) % 60));
-        } else chargeTime->setText(s == "completed" ? "结算完成 · " + statusText(text(active, "stop_reason")) : "");
+        } else if (s == "completed" || s == "paid") chargeTime->setText("已完成");
+        else if (s == "pending_payment" || s == "cancelled" || s == "canceled" || s == "stopped")
+            chargeTime->setText("已停止");
+        else chargeTime->setText("—");
     }
 }
