@@ -682,7 +682,7 @@ void AdminWindow::ordersPage() {
             continue;
         ++count;
         auto info = label(text(o, "station_name") + "   ·   " + text(o, "charger_code") + "\n" +
-                              text(o, "phone") + "   " + text(o, "reserved_at"),
+                              text(o, "phone") + "   " + localDateTime(text(o, "reserved_at")),
                           "font-size:13px;");
         auto status = label(statusText(text(o, "status")), "color:#c992e1;");
         auto cost = label(money(number(o, "energy_kwh")) + " kWh\n¥" + money(number(o, "amount")));
@@ -857,7 +857,7 @@ void AdminWindow::auditPage() {
             r->addLayout(textcol, 1);
             r->addWidget(label(localTime.time().toString("HH:mm:ss"), "color:#a88eba;font-size:11px;"));
             r->addWidget(button("查看 ↗", content, [=] {
-                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + text(o, "created_at") +
+                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + localDateTime(text(o, "created_at")) +
                                        "\n\n对象  " + text(o, "target_type") + "\n" +
                                        text(o, "target_id"));
                 showDetail(this, "审计事件", o);
@@ -1142,7 +1142,9 @@ void AdminWindow::manager(const QString &kind) {
                 for (int j = 0; j < columns.size(); j++)
                     table->setItem(
                         i, j,
-                        new QTableWidgetItem(statusText(text((*items)[i].toObject(), columns[j]))));
+                        new QTableWidgetItem(columns[j].endsWith("_at")
+                            ? localDateTime(text((*items)[i].toObject(), columns[j]))
+                            : statusText(text((*items)[i].toObject(), columns[j]))));
             table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
             table->horizontalHeader()->setStretchLastSection(true);applyFilters();
             title->setText(

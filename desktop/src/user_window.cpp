@@ -17,8 +17,8 @@ UserWindow::UserWindow(ApiClient *a, CacheStore *c, ApiClient *historicalClient)
     root->setProperty("mobile", true);
     centralWidget()->layout()->setContentsMargins(8, 8, 8, 8);
     outer->setContentsMargins(18, 20, 18, 12);
-    nav->addWidget(
-        label(QTime::currentTime().toString("hh:mm"), "font-size:12px;font-weight:600;"));
+    auto clock = label(QTime::currentTime().toString("HH:mm"), "font-size:12px;font-weight:600;");
+    nav->addWidget(clock);
     nav->addStretch();
     nav->addWidget(label("▂▄▆  ▰", "font-size:12px;"));
     footerBar = new QWidget;
@@ -64,8 +64,9 @@ UserWindow::UserWindow(ApiClient *a, CacheStore *c, ApiClient *historicalClient)
     events.setInterval(650);
     connect(&events, &QTimer::timeout, this, &UserWindow::refresh);
     connect(api, &ApiClient::eventReceived, this, [this](const QJsonObject &) { if (!events.isActive()) events.start(); });
-    poll.setInterval(3000);
-    connect(&poll, &QTimer::timeout, this, [this] {
+    poll.setInterval(1000);
+    connect(&poll, &QTimer::timeout, this, [this, clock] {
+        clock->setText(QTime::currentTime().toString("HH:mm"));
         updateCharging();
         if (api->authenticated() && !active.isEmpty() &&
             (text(active, "status") == "charging" || text(active, "status") == "reserved" || text(active, "status") == "pending_payment"))
@@ -507,10 +508,10 @@ void UserWindow::stationPage() {
             if(!r.ok){picker->setChargers(*previous,true,chargeMode==1);*readonly=true;pickerState->setText("状态读取失败，暂不可预约："+r.error);return;}
             const auto items=r.data.array();
             if(items!=*previous || r.cached!=*readonly){picker->setChargers(items,r.cached,chargeMode==1);*previous=items;*readonly=r.cached;}
-            pickerState->setText(r.cached?"离线缓存 · 暂不可预约":items.isEmpty()?"本站尚未配置电桩":picker->selectedId().isEmpty()?"请选择空闲电桩；若均不可用，请切换模式或站点。":"已选电桩以加粗边框标记 · 状态每 3 秒更新");
+            pickerState->setText(r.cached?"离线缓存 · 暂不可预约":items.isEmpty()?"本站尚未配置电桩":picker->selectedId().isEmpty()?"请选择空闲电桩；若均不可用，请切换模式或站点。":"已选电桩以加粗边框标记 · 状态每秒更新");
         });
     };
-    auto timer=new QTimer(box);connect(timer,&QTimer::timeout,box,load);timer->start(3000);load();
+    auto timer=new QTimer(box);connect(timer,&QTimer::timeout,box,load);timer->start(1000);load();
 
 }
 void UserWindow::charging() {
@@ -757,7 +758,7 @@ void UserWindow::profile() {
             auto o = v.toObject();
             rows->addWidget(detailLine("chart", statusText(text(o, "entry_type")),
                                        "¥" + money(number(o, "amount"))));
-            rows->addWidget(label(text(o, "created_at"), "font-size:10px;color:#957ba8;"));
+            rows->addWidget(label(localDateTime(text(o, "created_at")), "font-size:10px;color:#957ba8;"));
         }
         if (ledger.isEmpty())
             rows->addWidget(emptyPanel("暂无钱包流水", "充值或结算后会在此记录。", "chart"));
@@ -813,7 +814,7 @@ void UserWindow::history() {
         l->addWidget(
             label(money(number(o, "energy_kwh")) + " kWh     ¥" + money(number(o, "amount")),
                   "font-size:20px;"));
-        l->addWidget(label(text(o, "reserved_at"), muted));
+        l->addWidget(label(localDateTime(text(o, "reserved_at")), muted));
         l->addWidget(button("查看订单", this, [=] {
             api->get("/orders/" + text(o, "id"), this, [this](const Reply &r) {
                 if (r.ok) {

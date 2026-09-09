@@ -56,6 +56,12 @@ let stations = [],
   lastPosition = null,
   mapFitted = false;
 const token = () => localStorage.getItem("charging_user_token");
+const localDateTime = (value) => {
+  const date = new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return String(value || "—");
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
 const escapeHtml = (value) =>
   String(value ?? "").replace(
     /[&<>'\"]/g,
@@ -372,7 +378,7 @@ function startCharge() {
     } finally {
       polling = false;
     }
-  }, 2000);
+  }, 1000);
 }
 async function stopCharge() {
   if (!activeOrder) return showScreen("map");
@@ -414,7 +420,7 @@ function renderOrders(rows) {
     ? rows
         .map(
           (x) =>
-            `<article class="order-item">${x.status==="pending_payment"?`<button data-pay-order="${escapeHtml(x.id)}">支付账单</button>`:""}<span><svg viewBox="0 0 24 24"><path d="m13 2-7 12h6l-1 8 7-12h-6z"/></svg></span><div><h3>${escapeHtml(x.station_name)}</h3><p>${escapeHtml(x.charger_code)} · ${new Date(x.ended_at || x.created_at || Date.now()).toLocaleDateString("zh-CN")}</p></div><em>¥${Number(x.amount || 0).toFixed(2)}<small>${Number(x.energy_kwh || 0).toFixed(1)} kWh</small></em></article>`,
+            `<article class="order-item">${x.status==="pending_payment"?`<button data-pay-order="${escapeHtml(x.id)}">支付账单</button>`:""}<span><svg viewBox="0 0 24 24"><path d="m13 2-7 12h6l-1 8 7-12h-6z"/></svg></span><div><h3>${escapeHtml(x.station_name)}</h3><p>${escapeHtml(x.charger_code)} · ${localDateTime(x.ended_at || x.created_at)}</p></div><em>¥${Number(x.amount || 0).toFixed(2)}<small>${Number(x.energy_kwh || 0).toFixed(1)} kWh</small></em></article>`,
         )
         .join("")
     : '<p class="empty-state">暂无充电记录</p>';

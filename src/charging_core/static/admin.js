@@ -392,8 +392,13 @@ function renderStations() {
 }
 const statusCell = (v) =>
   `<span class="status ${esc(v)}">${esc(zhValue(v, "status"))}</span>`;
-const date = (v) =>
-  v ? new Date(v).toLocaleString("zh-CN", { hour12: false }) : "—";
+const date = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
 function table(headers, rows) {
   return `<div class="table-scroll"><table class="data-table"><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("") || `<tr><td colspan="${headers.length}" class="empty">暂无记录</td></tr>`}</tbody></table></div>`;
 }

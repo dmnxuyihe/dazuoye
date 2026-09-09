@@ -6,6 +6,7 @@
 QString text(const QJsonObject &o, const QString &key, const QString &fallback = "—");
 double number(const QJsonObject &o, const QString &key);
 QString money(double value);
+QString localDateTime(const QString &value);
 QString statusText(const QString &value);
 QString uid();
 QIcon appIcon(const QString &name, const QColor &color = QColor("#d7c5e8"));

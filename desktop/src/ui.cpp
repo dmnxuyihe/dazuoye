@@ -24,6 +24,13 @@ double number(const QJsonObject &o, const QString &key) {
 QString money(double v) {
     return QLocale(QLocale::Chinese).toString(v, 'f', 2);
 }
+QString localDateTime(const QString &value) {
+    if (value.isEmpty()) return value;
+    auto dateTime = QDateTime::fromString(value, Qt::ISODateWithMs);
+    if (!dateTime.isValid()) dateTime = QDateTime::fromString(value, Qt::ISODate);
+    if (!dateTime.isValid()) return value;
+    return dateTime.toLocalTime().toString("yyyy-MM-dd HH:mm:ss");
+}
 QString uid() {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
@@ -365,7 +372,10 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
             table->setHorizontalHeaderLabels(headings);
             for (int i = 0; i < rows.size(); ++i)
                 for (int j = 0; j < keys.size(); ++j)
-                    table->setItem(i, j, new QTableWidgetItem(statusText(text(rows[i].toObject(), keys[j]))));
+                    table->setItem(i, j, new QTableWidgetItem(
+                        keys[j].endsWith("_at") || keys[j].endsWith("_until")
+                            ? localDateTime(text(rows[i].toObject(), keys[j]))
+                            : statusText(text(rows[i].toObject(), keys[j]))));
             table->setEditTriggers(QAbstractItemView::NoEditTriggers);
             table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
             table->setMinimumHeight(280);
@@ -378,6 +388,8 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
                 it.value().isObject()
                     ? QJsonDocument(it.value().toObject()).toJson(QJsonDocument::Indented)
                     : QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
+        else if (it.key().endsWith("_at") || it.key().endsWith("_until"))
+            value = localDateTime(it.value().toVariant().toString());
         else
             value = statusText(it.value().toVariant().toString());
         auto field =
