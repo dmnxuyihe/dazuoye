@@ -153,6 +153,8 @@ class AdminService:
         latitude: Decimal,
         unit_price: Decimal,
         initial_chargers: int = 0,
+        initial_charger_kind: str = "fast",
+        initial_charger_power_kw: Decimal = Decimal("60"),
         address_verified: bool = False,
     ) -> dict[str, Any]:
         station_id = uuid4()
@@ -172,8 +174,9 @@ class AdminService:
             )
             for index in range(initial_chargers):
                 await connection.execute(
-                    "INSERT INTO charger(id,station_id,code,kind,power_kw) VALUES($1,$2,$3,'fast',120)",
+                    "INSERT INTO charger(id,station_id,code,kind,power_kw) VALUES($1,$2,$3,$4,$5)",
                     uuid4(), station_id, f"{name[:6]}-{station_id.hex[:8]}-{index + 1:03d}",
+                    initial_charger_kind, initial_charger_power_kw,
                 )
             await self._log(connection, admin_id, "station.created", "station", station_id,
                             {"initial_chargers": initial_chargers})

@@ -346,14 +346,22 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
         {"start_hour","开始小时（北京时间）"},{"end_hour","结束小时（北京时间）"},{"start","时段开始"},{"end","时段结束"},{"electricity_price","电费 元/kWh"},
         {"service_price","服务费 元/kWh"},{"unit_price","合计单价 元/kWh"},{"energy_kwh","电量 kWh"},
         {"tariff_snapshot","预约时价格"},{"billing_detail","分时明细"},{"held_balance","冻结金额"},
-        {"available_balance","可用余额"},{"vehicle_name","车型"},{"vehicle_plate","车牌"},{"paid_at","付款时间"}})
+        {"available_balance","可用余额"},{"vehicle_name","车型"},{"vehicle_plate","车牌"},{"paid_at","付款时间"},
+        {"battery_kwh","车辆电池容量 kWh"},{"initial_soc","开始充电时电量（%）"},
+        {"vehicle_soc","结束充电时电量（%）"},{"target_energy_kwh","计划充电量 kWh"},
+        {"balance_before","订单前余额"},{"balance_after","订单后余额"},
+        {"address_verified","地址是否已核验"},{"online_rate","设备在线率（%）"},
+        {"online_count","在线设备数量"},{"tariff","分时价格方案"}})
         fields.insert(pair.first,pair.second);
     fields.insert("entry_type", "收支类型"); fields.insert("balance_after", "交易后余额");
     fields.insert("created_at", "创建时间"); fields.insert("order_id", "订单编号");
     fields.insert("amount", "金额"); fields.insert("id", "记录编号");
     fields.insert("code", "电桩编号"); fields.insert("status", "状态");
     fields.insert("power_kw", "功率 kW"); fields.insert("total_sessions", "累计充电次数");
+    fields.insert("total_minutes", "累计运行分钟");
     for (auto it = data.begin(); it != data.end(); ++it) {
+        if (it.key() == "avatar_path")
+            continue;
         if (it.value().isArray()) {
             auto rows = it.value().toArray();
             auto table = new QTableWidget;
@@ -368,8 +376,15 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
                     table->setItem(i, j, new QTableWidgetItem(statusText(text(rows[i].toObject(), keys[j]))));
             table->setEditTriggers(QAbstractItemView::NoEditTriggers);
             table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-            table->setMinimumHeight(280);
-            form->addRow(it.key(), table);
+            const bool compactPricingTable = it.key() == "billing_detail" || it.key() == "tariff_snapshot";
+            if (compactPricingTable) {
+                table->setFixedHeight(165);
+                table->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+                table->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+            } else {
+                table->setMinimumHeight(280);
+            }
+            form->addRow(fields.value(it.key()).toString(it.key()), table);
             continue;
         }
         QString value;
@@ -442,6 +457,10 @@ void editForm(QWidget *p, ApiClient *api, const QString &title, const QString &m
         });
     });
     d->setMinimumWidth(420);
+    if (title == "部分退款")
+        d->resize(460, 380);
+    else if (title == "新增记录")
+        d->resize(460, 360);
     d->show();
 }
 QWidget *picture(const QString &name, int height) {

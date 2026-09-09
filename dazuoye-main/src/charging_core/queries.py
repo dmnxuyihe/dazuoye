@@ -90,10 +90,20 @@ async def order_snapshot(
     result["available_balance"] = row["balance"] - row["held_balance"]
     result["tariff_snapshot"] = tariff_rows(row["tariff_snapshot"],row["unit_price"])
     result["billing_detail"] = json.loads(row["billing_detail"]) if isinstance(row["billing_detail"],str) else row["billing_detail"]
+    wallet = await connection.fetchrow(
+        "SELECT amount,balance_after FROM wallet_entry WHERE order_id=$1 ORDER BY created_at DESC LIMIT 1",
+        order_id,
+    )
+    if wallet:
+        result["balance_before"] = wallet["balance_after"] - wallet["amount"]
+        result["balance_after"] = wallet["balance_after"]
     if row["status"] == "charging":
         result.update(meter(row,row["db_now"],result["available_balance"]))
         result.pop("ended_at",None)
     if row["battery_kwh"]:
         result["vehicle_soc"] = min(100,row["initial_soc"] + result["energy_kwh"] / row["battery_kwh"] * 100)
+    result.pop("balance", None)
+    result.pop("held_balance", None)
+    result.pop("available_balance", None)
     result.pop("db_now",None)
     return result

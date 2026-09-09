@@ -21,7 +21,7 @@ class AdminWindow : public DesktopWindow {
     void manualLogin();
     QJsonArray stations, chargers, users, orders, logs;
     QJsonObject summary, preferences, analytics;
-    QString selectedOrder, selectedStation, forecastScope = "all", orderFilter = "all", orderSearch;
+    QString selectedOrder, selectedStation, forecastScope = "business", orderFilter = "all", orderSearch;
     QPointer<QObject> refreshContext;
     QTimer refreshTimer;
     std::function<void()> dashboardLoader;

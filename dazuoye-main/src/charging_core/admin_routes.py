@@ -16,11 +16,21 @@ class UserStatusUpdate(BaseModel):
 class StationCreate(BaseModel):
     address_verified: bool = False
     initial_chargers: int = Field(default=0, ge=0, le=100)
+    initial_charger_kind: Literal["fast", "slow"] = "fast"
+    initial_charger_power_kw: Decimal = Field(default=60, gt=0, le=240, decimal_places=2)
     name: str = Field(min_length=1, max_length=100)
     address: str = Field(min_length=1, max_length=200)
     longitude: Decimal = Field(ge=-180, le=180, decimal_places=6)
     latitude: Decimal = Field(ge=-90, le=90, decimal_places=6)
     unit_price: Decimal = Field(gt=0, le=9999, decimal_places=2)
+
+    @model_validator(mode="after")
+    def validate_initial_charger_power(self) -> "StationCreate":
+        if self.initial_charger_kind == "slow" and not Decimal("3.5") <= self.initial_charger_power_kw <= Decimal("14"):
+            raise ValueError("慢充额定功率须在 3.5–14 kW 之间")
+        if self.initial_charger_kind == "fast" and not Decimal("20") <= self.initial_charger_power_kw <= Decimal("240"):
+            raise ValueError("快充额定功率须在 20–240 kW 之间")
+        return self
 
 
 class StationUpdate(BaseModel):
