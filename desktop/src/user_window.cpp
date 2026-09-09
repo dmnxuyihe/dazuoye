@@ -183,6 +183,17 @@ void UserWindow::refresh() {
             }
         });
 }
+void UserWindow::refreshProfile() {
+    api->get("/me", this, [this](const Reply &r) {
+        if (!r.ok) {
+            message(r);
+            return;
+        }
+        me = r.data.object();
+        if (current == "profile")
+            navigate("profile");
+    });
+}
 void UserWindow::navigate(const QString &page) {
     if (page == "station" && text(active, "status") == "pending_payment") {
         QMessageBox dialog(QMessageBox::Warning, "请先结算",

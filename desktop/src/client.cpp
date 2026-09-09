@@ -190,6 +190,11 @@ void ApiClient::request(const QString &method, const QString &path, const QJsonO
             done(r);
     });
 }
+Reply ApiClient::cached(const QString &path) const {
+    if (!cache)
+        return {};
+    return cache->get(base.toString() + "|" + subject + "|" + sessionRole + "|" + path);
+}
 void ApiClient::session(const QString &token) {
     logout();
     bearer = token;

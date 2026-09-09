@@ -52,7 +52,7 @@ void UserWindow::profile() {
     auto edit = button("编辑", this, [this] {
         if (!api->authenticated()) { login(); return; }
         editForm(this, api, "个人资料", "PATCH", "/me", {{"nickname", "昵称"}},
-                 {{"nickname", me.value("nickname")}}, [this] { refresh(); });
+                 {{"nickname", me.value("nickname")}}, [this] { refreshProfile(); });
     });
     edit->setIcon(appIcon("settings"));
     edit->setIconSize(QSize(18,18));

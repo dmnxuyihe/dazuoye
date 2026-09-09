@@ -6,6 +6,7 @@ class UserWindow : public DesktopWindow {
     UserWindow(ApiClient *api, CacheStore *cache, ApiClient *historicalClient = nullptr);
     void navigate(const QString &page) override;
     void refresh();
+    void refreshProfile();
     void login();
 
   private:

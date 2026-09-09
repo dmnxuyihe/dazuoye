@@ -39,6 +39,7 @@ class ApiClient : public QObject {
     void get(const QString &path, QObject *context, Callback done) {
         request("GET", path, {}, context, std::move(done));
     }
+    Reply cached(const QString &path) const;
     virtual void session(const QString &token);
     void logout();
     virtual bool authenticated() const {

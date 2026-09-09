@@ -164,7 +164,17 @@ void UserWindow::stationPage() {
             pickerState->setText(r.cached?"离线缓存，暂不可预约":items.isEmpty()?"本站尚未配置电桩":"");
         });
     };
-    auto timer=new QTimer(box);connect(timer,&QTimer::timeout,box,load);timer->start(1000);load();
+    // Paint the last successful snapshot synchronously. The request below then
+    // confirms whether booking is safe and replaces stale data in-place.
+    const auto chargerPath = "/public/stations/"+stationId+"/chargers";
+    const auto cached = api->cached(chargerPath);
+    if (cached.ok) {
+        *previous = cached.data.array();
+        *readonly = true;
+        applyPickerFilters();
+    }
+    // Avoid competing with the periodic account snapshot for network slots.
+    auto timer=new QTimer(box);connect(timer,&QTimer::timeout,box,load);timer->start(5000);load();
 
 }
 void UserWindow::charging() {
