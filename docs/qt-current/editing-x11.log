@@ -1,0 +1,9 @@
+********* Start testing of EditingTest *********
+Config: Using QtTest library 6.5.3, Qt 6.5.3 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 10.3.1 20210422 (Red Hat 10.3.1-1)), ubuntu 22.04
+PASS   : EditingTest::initTestCase()
+PASS   : EditingTest::imageOperations()
+PASS   : EditingTest::liveChargerSelection()
+PASS   : EditingTest::compactAvatarDialog()
+PASS   : EditingTest::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 555ms
+********* Finished testing of EditingTest *********

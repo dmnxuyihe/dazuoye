@@ -1,20 +1,27 @@
-# Local IDE metadata and generated build trees
-**/.qtcreator/
+.venv/
+.env
+.env.local
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+logs/
+.runtime/
+
+# Local delivery archives, previous snapshots and build output (kept on disk).
+/deliverables/
+/dist/
+/assignment_0/
+/*.zip
+/*.log
 **/build/
 **/build-*/
 **/cmake-build-*/
-
-# Python local environments and caches
-**/.venv/
-**/venv/
-**/__pycache__/
-**/*.py[cod]
-**/.pytest_cache/
-
-# Local secrets (keep documented examples)
-**/.env
-!**/.env.example
-
-# Common operating-system files
+**/.qtcreator/
 .DS_Store
 Thumbs.db
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env.*
+!.env.example

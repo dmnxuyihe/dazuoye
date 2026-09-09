@@ -1,0 +1,15 @@
+Test project /home/liuzihang/ljw-gf/assignment/.runtime/qt-build
+    Start 1: editing-interactions
+1/5 Test #1: editing-interactions .............   Passed    0.67 sec
+    Start 2: dialog-fit
+2/5 Test #2: dialog-fit .......................   Passed    1.03 sec
+    Start 3: native-pages
+3/5 Test #3: native-pages .....................   Passed    5.36 sec
+    Start 4: map-interaction
+4/5 Test #4: map-interaction ..................   Passed    0.42 sec
+    Start 5: client-contract
+5/5 Test #5: client-contract ..................   Passed    0.13 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Total Test time (real) =   7.62 sec
