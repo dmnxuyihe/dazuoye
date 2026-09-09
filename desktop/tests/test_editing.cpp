@@ -1,6 +1,10 @@
 #include "avatar_editor.h"
+#include "avatar_capture_dialog.h"
 #include "charger_picker.h"
+#include "face_image_processor.h"
 #include <QtTest>
+#include <QMediaDevices>
+#include <QCameraDevice>
 class EditingTest:public QObject {
     Q_OBJECT
   private slots:
@@ -58,6 +62,12 @@ class EditingTest:public QObject {
         QCOMPARE(avatar.pixelColor(55,55).alpha(),0);
         QCOMPARE(avatar.pixelColor(28,28),QColor(Qt::yellow));
     }
+    void faceProcessorRejectsTinyImagesSafely() {
+        QImage tiny(32,32,QImage::Format_RGB32);tiny.fill(Qt::white);
+        const auto result=FaceImageProcessor::process(tiny);
+        QVERIFY(!result.ok);
+        QVERIFY(!result.error.isEmpty());
+    }
     void liveChargerSelection() {
         ChargerPicker picker;picker.resize(320,500);picker.show();
         QJsonArray data;
@@ -97,10 +107,29 @@ class EditingTest:public QObject {
         QWidget owner;owner.resize(360,700);owner.show();showAvatarEditor(&owner,&api,[](const QJsonObject &){});
         auto d=owner.findChild<QDialog *>();QVERIFY(d);QTest::qWait(150);
         auto save=d->findChild<QPushButton *>("avatar-save");QVERIFY(save);
+        auto normal=d->findChild<QRadioButton *>("avatar-mode-normal");QVERIFY(normal);QVERIFY(normal->isChecked());
+        auto face=d->findChild<QRadioButton *>("avatar-mode-face");QVERIFY(face);
         QVERIFY(d->rect().contains(QRect(save->mapTo(d,QPoint()),save->size())));
         auto canvas=d->findChild<QWidget *>("avatar-canvas");QVERIFY(canvas);
         auto sample=d->findChild<QPushButton *>("avatar-sample-ev-top-photo.png");QVERIFY(sample);QTest::mouseClick(sample,Qt::LeftButton);
         QDir().mkpath(".runtime/qt-cards-avatar/screenshots");d->grab().save(".runtime/qt-cards-avatar/screenshots/avatar-editor.png");d->close();
+    }
+    void cameraCaptureClickLifecycle() {
+        if(QMediaDevices::videoInputs().isEmpty())QSKIP("No camera is available on this machine");
+        QWidget owner;owner.resize(520,640);owner.setStyleSheet("background:#100b1b;");owner.show();
+        AvatarCaptureDialog dialog(&owner);dialog.show();
+        auto shutter=dialog.findChild<QPushButton *>("avatar-camera-shutter");QVERIFY(shutter);
+        QTRY_VERIFY_WITH_TIMEOUT(shutter->isEnabled(),10000);
+        QTest::mouseClick(shutter,Qt::LeftButton);
+        auto confirm=dialog.findChild<QPushButton *>("avatar-camera-confirm");QVERIFY(confirm);
+        QTRY_VERIFY_WITH_TIMEOUT(confirm->isVisible(),10000);
+        QDir().mkpath(".runtime/qt-cards-avatar/screenshots");
+        dialog.grab().save(".runtime/qt-cards-avatar/screenshots/camera-after-click.png");
+        QVERIFY(QMetaObject::invokeMethod(&dialog,"reject",Qt::DirectConnection));QTRY_VERIFY(!dialog.isVisible());
+        const QImage parentImage=owner.grab().toImage();
+        int nearWhite=0;
+        for(int y=0;y<parentImage.height();++y)for(int x=0;x<parentImage.width();++x){const QColor c=parentImage.pixelColor(x,y);if(c.red()>245&&c.green()>245&&c.blue()>245)++nearWhite;}
+        QVERIFY(nearWhite<parentImage.width()*parentImage.height()/20);
     }
 };
 int main(int argc,char **argv){QApplication app(argc,argv);applyTheme(app);EditingTest test;return QTest::qExec(&test,argc,argv);}

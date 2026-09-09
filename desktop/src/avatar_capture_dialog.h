@@ -10,7 +10,7 @@ class QLabel;
 class QMediaCaptureSession;
 class QPushButton;
 class QStackedWidget;
-class QVideoWidget;
+class QVideoSink;
 
 class AvatarCaptureDialog : public QDialog {
     Q_OBJECT
@@ -40,7 +40,8 @@ class AvatarCaptureDialog : public QDialog {
     QImage frozenImage;
     QStackedWidget *viewStack = nullptr;
     QLabel *loadingLabel = nullptr;
-    QVideoWidget *videoWidget = nullptr;
+    QLabel *videoPreview = nullptr;
+    QVideoSink *videoSink = nullptr;
     QLabel *frozenLabel = nullptr;
     QLabel *hintLabel = nullptr;
     QComboBox *cameraSelector = nullptr;

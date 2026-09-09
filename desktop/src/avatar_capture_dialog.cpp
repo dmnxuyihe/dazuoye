@@ -7,22 +7,30 @@
 #include <QMediaCaptureSession>
 #include <QMediaDevices>
 #include <QMessageBox>
+#include <QPalette>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QShowEvent>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <QVideoWidget>
+#include <QVideoFrame>
+#include <QVideoSink>
 
 namespace {
 constexpr int PreviewSide = 360;
 }
 
 AvatarCaptureDialog::AvatarCaptureDialog(QWidget *parent) : QDialog(parent) {
+    setObjectName("avatar-capture-dialog");
     setWindowTitle("拍照上传头像");
     setModal(true);
     setMinimumSize(430, 525);
+    setStyleSheet(
+        "QDialog#avatar-capture-dialog{background:#100b1b;}"
+        "QStackedWidget#avatar-camera-view{background:#130d1c;border:0;}"
+        "QLabel#avatar-camera-video{background:#130d1c;border:0;}"
+        "QPushButton:focus{outline:none;}");
     setupUi();
     setState(State::Idle);
 }
@@ -39,17 +47,25 @@ void AvatarCaptureDialog::setupUi() {
     root->addWidget(cameraSelector);
 
     viewStack = new QStackedWidget(this);
+    viewStack->setObjectName("avatar-camera-view");
     viewStack->setFixedSize(PreviewSide, PreviewSide);
     loadingLabel = new QLabel("正在打开摄像头…", viewStack);
     loadingLabel->setAlignment(Qt::AlignCenter);
     loadingLabel->setStyleSheet("background:#130d1c;color:#cfbddb;");
-    videoWidget = new QVideoWidget(viewStack);
-    videoWidget->setAspectRatioMode(Qt::KeepAspectRatioByExpanding);
+    videoPreview = new QLabel(viewStack);
+    videoPreview->setObjectName("avatar-camera-video");
+    videoPreview->setAlignment(Qt::AlignCenter);
+    videoPreview->setFocusPolicy(Qt::NoFocus);
+    videoPreview->setAutoFillBackground(true);
+    QPalette videoPalette = videoPreview->palette();
+    videoPalette.setColor(QPalette::Window, QColor("#130d1c"));
+    videoPreview->setPalette(videoPalette);
+    videoPreview->setMinimumSize(PreviewSide, PreviewSide);
     frozenLabel = new QLabel(viewStack);
     frozenLabel->setAlignment(Qt::AlignCenter);
     frozenLabel->setStyleSheet("background:#130d1c;");
     viewStack->addWidget(loadingLabel);
-    viewStack->addWidget(videoWidget);
+    viewStack->addWidget(videoPreview);
     viewStack->addWidget(frozenLabel);
     root->addWidget(viewStack, 0, Qt::AlignHCenter);
 
@@ -60,9 +76,11 @@ void AvatarCaptureDialog::setupUi() {
 
     auto actions = new QHBoxLayout;
     shutterButton = new QPushButton("拍摄", this);
+    shutterButton->setObjectName("avatar-camera-shutter");
     shutterButton->setProperty("primary", true);
     retakeButton = new QPushButton("重拍", this);
     confirmButton = new QPushButton("使用照片", this);
+    confirmButton->setObjectName("avatar-camera-confirm");
     confirmButton->setProperty("primary", true);
     auto cancelButton = new QPushButton("取消", this);
     for (auto button : {shutterButton, retakeButton, confirmButton, cancelButton}) {
@@ -99,20 +117,30 @@ void AvatarCaptureDialog::showEvent(QShowEvent *event) {
 void AvatarCaptureDialog::startCamera(int deviceIndex) {
     const auto devices = QMediaDevices::videoInputs();
     if (deviceIndex < 0 || deviceIndex >= devices.size()) return;
+    viewStack->setCurrentWidget(loadingLabel);
     stopCamera();
     captureSession = new QMediaCaptureSession(this);
     imageCapture = new QImageCapture(this);
+    videoSink = new QVideoSink(this);
     camera = new QCamera(devices.at(deviceIndex), this);
     captureSession->setCamera(camera);
-    captureSession->setVideoOutput(videoWidget);
+    captureSession->setVideoSink(videoSink);
     captureSession->setImageCapture(imageCapture);
+    connect(videoSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &frame) {
+        if (state != State::Previewing || !frame.isValid()) return;
+        const QImage image = frame.toImage();
+        if (image.isNull()) return;
+        videoPreview->setPixmap(QPixmap::fromImage(image).scaled(
+            PreviewSide, PreviewSide, Qt::KeepAspectRatioByExpanding,
+            Qt::SmoothTransformation));
+    });
     connect(camera, &QCamera::errorOccurred, this,
             [this](QCamera::Error, const QString &message) {
                 hintLabel->setText(message.isEmpty() ? "摄像头打开失败，请检查系统权限。" : message);
             });
     connect(camera, &QCamera::activeChanged, this, [this](bool active) {
         if (!active || state != State::Previewing) return;
-        viewStack->setCurrentWidget(videoWidget);
+        viewStack->setCurrentWidget(videoPreview);
         hintLabel->setText("对准后点击“拍摄”");
         shutterButton->setEnabled(imageCapture && imageCapture->isReadyForCapture());
     });
@@ -129,8 +157,10 @@ void AvatarCaptureDialog::startCamera(int deviceIndex) {
                     PreviewSide, PreviewSide, Qt::KeepAspectRatioByExpanding,
                     Qt::SmoothTransformation);
                 frozenLabel->setPixmap(preview);
-                camera->stop();
                 setState(State::Frozen);
+                // Hide the native video surface before stopping it. Windows may
+                // otherwise clear that surface to white for one frame.
+                camera->stop();
             });
     connect(imageCapture, &QImageCapture::errorOccurred, this,
             [this](int, QImageCapture::Error, const QString &message) {
@@ -143,12 +173,20 @@ void AvatarCaptureDialog::startCamera(int deviceIndex) {
 
 void AvatarCaptureDialog::stopCamera() {
     if (camera) camera->stop();
-    delete camera;
-    delete imageCapture;
+    if (captureSession) {
+        captureSession->setCamera(nullptr);
+        captureSession->setImageCapture(nullptr);
+        captureSession->setVideoSink(nullptr);
+    }
     delete captureSession;
+    delete videoSink;
+    delete imageCapture;
+    delete camera;
     camera = nullptr;
     imageCapture = nullptr;
+    videoSink = nullptr;
     captureSession = nullptr;
+    if (videoPreview) videoPreview->clear();
 }
 
 void AvatarCaptureDialog::setState(State nextState) {
@@ -186,11 +224,13 @@ void AvatarCaptureDialog::retake() {
 void AvatarCaptureDialog::confirm() {
     if (state != State::Frozen || frozenImage.isNull()) return;
     state = State::Accepted;
+    hide();
     stopCamera();
     accept();
 }
 
 void AvatarCaptureDialog::reject() {
+    hide();
     stopCamera();
     frozenImage = {};
     state = State::Idle;
