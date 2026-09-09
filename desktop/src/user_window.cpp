@@ -54,6 +54,7 @@ UserWindow::UserWindow(ApiClient *a, CacheStore *c, ApiClient *historicalClient)
         active = {};
         orders = {};
         ledger = {};
+        withdrawals = {};
         navigate("profile");
         connection->setText("会话已过期，请重新登录");
     });
@@ -107,7 +108,7 @@ void UserWindow::refresh() {
         .arg(settings.value(prefix+"/lat").toDouble(),0,'f',6).arg(settings.value(prefix+"/lon").toDouble(),0,'f',6);
     QStringList paths = {stationPath};
     if (api->authenticated())
-        paths << "/me" << "/me/orders?limit=200" << "/me/wallet-entries?limit=200";
+        paths << "/me" << "/me/orders?limit=200" << "/me/wallet-entries?limit=200" << "/me/withdrawals";
     auto pending = std::make_shared<int>(paths.size());
     auto failures = std::make_shared<QStringList>();
     auto cachedAt = std::make_shared<QString>();
@@ -138,6 +139,8 @@ void UserWindow::refresh() {
                 }
                 if (i == 3)
                     ledger = r.data.array();
+                if (i == 4)
+                    withdrawals = r.data.array();
             }
             if (--*pending == 0) {
                 if (selectedStation.isEmpty() && !stations.isEmpty()) {
@@ -161,7 +164,7 @@ void UserWindow::refresh() {
                     }
                     return QJsonObject{};
                 };
-                if (body->count() <= 1 || current == "profile" || current == "wallet" || current == "history" ||
+                if (body->count() <= 1 || current == "profile" || current == "wallet" || current == "withdrawals" || current == "history" ||
                     ((current == "home" || current == "map") && stations != previousStations) ||
                     (current == "station" && stationTerms(stations)!=stationTerms(previousStations)) ||
                     (current == "charging" && text(active, "status") != previousStatus))
@@ -205,8 +208,12 @@ void UserWindow::navigate(const QString &page) {
         history();
     else if (page == "profile")
         profile();
+    else if (page == "avatar")
+        avatarPage();
     else if (page == "wallet")
         wallet();
+    else if (page == "withdrawals")
+        withdrawalsPage();
     else
         home();
     body->addStretch();

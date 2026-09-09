@@ -1,6 +1,8 @@
 #pragma once
 #include "ui.h"
 
+QImage circularAvatarImage(const QImage &image, int size);
+
 class AvatarCanvas : public QWidget {
   public:
     explicit AvatarCanvas(QWidget *parent=nullptr);
@@ -22,3 +24,6 @@ class AvatarCanvas : public QWidget {
 };
 void showAvatarEditor(QWidget *owner, ApiClient *api, std::function<void(const QJsonObject &)> saved,
                       const QImage &current = {});
+QWidget *createAvatarEditorPage(QWidget *owner, ApiClient *api,
+                                std::function<void(const QJsonObject &)> saved,
+                                const QImage &current = {});

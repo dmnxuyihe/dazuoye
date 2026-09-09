@@ -189,7 +189,7 @@ class VisualTest : public QObject {
         QTest::qWait(100);
         QDir().mkpath(".runtime/qt-complete/test-screenshots/user");
         for (auto page :
-             {"home", "map", "station", "charging", "stats", "schedule", "history", "profile"}) {
+             {"home", "map", "station", "charging", "stats", "schedule", "history", "profile", "avatar"}) {
             w.navigate(page);
             QTest::qWait(100);
             QVERIFY(w.grab().save(

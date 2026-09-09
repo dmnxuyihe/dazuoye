@@ -16,13 +16,15 @@ class UserWindow : public DesktopWindow {
     void statistics();
     void schedule();
     void profile();
+    void avatarPage();
     void wallet();
+    void withdrawalsPage();
     void history();
     void orderCommand(const QString &action);
     void updateCharging();
     void loadStatistics();
     double batterySoc() const;
-    QJsonArray stations, chargers, orders, ledger;
+    QJsonArray stations, chargers, orders, ledger, withdrawals;
     QJsonObject me, active, analytics;
     QString selectedStation;
     int statsPeriod = 0, tariffMode = 0, chargeMode = 0, historyFilter = 0, walletFilter = 0;

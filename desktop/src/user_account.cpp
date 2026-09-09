@@ -16,21 +16,36 @@ void UserWindow::profile() {
     body->addWidget(pageHeading("个人中心", this, [this] { navigate("home"); }));
     QVBoxLayout *l;
     auto account = card("", &l);
-    account->setStyleSheet(
-        "QFrame#card{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #422158,stop:.5 "
-        "#2b183d,stop:1 #1a112a);border:1px solid #684073;border-radius:20px;}");
+    account->setObjectName("profile-account");
+    account->setStyleSheet("QFrame#profile-account{background:transparent;border:0;border-radius:0;}");
     auto header = new QHBoxLayout;
     header->setSpacing(16);
     auto avatar = button(api->authenticated() ? text(me, "nickname", "E").left(1) : "E", this, [this] {
         if (!api->authenticated()) { login(); return; }
-        QImage currentAvatar;
-        currentAvatar.loadFromData(QByteArray::fromBase64(text(me,"avatar_data").toLatin1()),"PNG");
-        showAvatarEditor(this,api,[this](const QJsonObject &account){me=account;navigate("profile");},currentAvatar);
+        navigate("avatar");
     });
-    avatar->setStyleSheet("font-size:23px;font-weight:600;background:#9455b4;border:0;border-radius:28px;padding:0;");
+    avatar->setObjectName("profile-avatar");
+    avatar->setStyleSheet("QPushButton#profile-avatar{background:transparent;border:0;padding:0;}");
     avatar->setFixedSize(56, 56);
+    avatar->setMask(QRegion(avatar->rect(), QRegion::Ellipse));
     auto avatarData = QByteArray::fromBase64(text(me,"avatar_data","").toUtf8());
-    if (!avatarData.isEmpty()) { QPixmap pix; pix.loadFromData(avatarData,"PNG"); if (!pix.isNull()) avatar->setIcon(QIcon(pix)); avatar->setIconSize(QSize(56,56)); }
+    QImage roundImage;
+    if (!avatarData.isEmpty()) {
+        QImage image;
+        image.loadFromData(avatarData, "PNG");
+        roundImage = circularAvatarImage(image, 56);
+    }
+    if (roundImage.isNull()) {
+        roundImage = QImage(56,56,QImage::Format_ARGB32_Premultiplied);
+        roundImage.fill(Qt::transparent);
+        QPainter painter(&roundImage);painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);painter.setBrush(QColor("#9455b4"));painter.drawEllipse(QRectF(0,0,56,56));
+        QFont font=avatar->font();font.setPixelSize(23);font.setWeight(QFont::DemiBold);
+        painter.setFont(font);painter.setPen(Qt::white);painter.drawText(roundImage.rect(),Qt::AlignCenter,avatar->text());
+    }
+    avatar->setText("");
+    avatar->setIcon(QIcon(QPixmap::fromImage(roundImage)));
+    avatar->setIconSize(QSize(56,56));
     header->addWidget(avatar);
     header->addWidget(label(api->authenticated() ? text(me, "nickname", "充电用户") : "欢迎来到 ELECTRA",
                             "font-size:18px;font-weight:600;"), 1);
@@ -96,10 +111,7 @@ void UserWindow::profile() {
              {"vehicle_soc",batterySoc()},{"charge_limit",me.contains("charge_limit")?me.value("charge_limit"):QJsonValue(80)}},
             [this]{active={};refresh();});
     });
-    shortcut("提现", "arrow", [this] {
-        editForm(this,api,"申请提现（审核后模拟到账）","POST","/wallet/withdrawals",
-            {{"amount","提现金额（元）"},{"destination","演示收款账户"}},{{"idempotency_key",uid()},{"destination","演示钱包"}},[this]{refresh();});
-    });
+    shortcut("提现", "arrow", [this] { navigate("withdrawals"); });
     shortcutLayout->addLayout(shortcutRow);
     body->addWidget(shortcuts);
 
@@ -119,10 +131,25 @@ void UserWindow::profile() {
         active = {};
         orders = {};
         ledger = {};
+        withdrawals = {};
         navigate("profile");
     });
     logout->setProperty("quiet", true);
+    logout->setStyleSheet("QPushButton{background:#1a1322;border:1px solid #2f2339;color:#9f8daa;}QPushButton:hover{background:#24192e;border-color:#493455;color:#c4b1cf;}");
     body->addWidget(logout);
+}
+void UserWindow::avatarPage() {
+    body->addWidget(pageHeading("编辑头像",this,[this]{navigate("profile");}));
+    if (!api->authenticated()) {
+        body->addWidget(button("请先登录",this,[this]{login();},true));
+        return;
+    }
+    QImage currentAvatar;
+    currentAvatar.loadFromData(QByteArray::fromBase64(text(me,"avatar_data").toLatin1()),"PNG");
+    body->addWidget(createAvatarEditorPage(this,api,[this](const QJsonObject &account){
+        me=account;
+        navigate("profile");
+    },currentAvatar),1);
 }
 void UserWindow::wallet() {
     body->addWidget(pageHeading("我的钱包", this, [this] { navigate("profile"); }));
@@ -195,6 +222,93 @@ void UserWindow::wallet() {
     if (!shown) rows->addWidget(emptyPanel(walletFilter?"暂无消费记录":"暂无资金记录","充值、提现或结算后会在此记录。","chart"));
     rows->addStretch();
     scroll->setWidget(content);
+    recordsLayout->addWidget(scroll,1);
+    body->addWidget(records,1);
+}
+void UserWindow::withdrawalsPage() {
+    body->addWidget(pageHeading("提现审核", this, [this] { navigate("profile"); }));
+    if (!api->authenticated()) {
+        body->addWidget(button("请先登录", this, [this] { login(); }, true));
+        return;
+    }
+
+    double pendingAmount = 0;
+    int pendingCount = 0, approvedCount = 0, rejectedCount = 0;
+    for (const auto &value : withdrawals) {
+        const auto record = value.toObject();
+        const auto status = text(record,"status");
+        if (status == "pending") { pendingAmount += number(record,"amount"); ++pendingCount; }
+        else if (status == "paid" || status == "approved") ++approvedCount;
+        else if (status == "rejected") ++rejectedCount;
+    }
+
+    QVBoxLayout *summaryLayout;
+    auto summary = card("",&summaryLayout);
+    summary->setStyleSheet(
+        "QFrame#card{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #422158,stop:.5 "
+        "#2b183d,stop:1 #1a112a);border:1px solid #684073;border-radius:20px;}");
+    auto pendingLabel=label("¥ "+money(pendingAmount),"font-size:34px;font-weight:600;");
+    pendingLabel->setAlignment(Qt::AlignCenter);
+    auto caption=label("提现待审核金额","font-size:12px;color:#c1a7d0;");
+    caption->setAlignment(Qt::AlignCenter);
+    summaryLayout->addWidget(pendingLabel);
+    summaryLayout->addWidget(caption);
+    body->addWidget(summary);
+
+    auto counts = new QWidget;
+    auto countRow = new QHBoxLayout(counts);
+    countRow->setContentsMargins(0,0,0,0); countRow->setSpacing(0);
+    auto countBlock=[](int count,const QString &name) {
+        auto w=new QWidget; auto l=new QVBoxLayout(w); l->setContentsMargins(0,0,0,0); l->setSpacing(4);
+        auto value=label(QString::number(count),"font-size:19px;font-weight:600;");
+        auto caption=label(name,"font-size:10px;color:#b3a0c2;");
+        value->setAlignment(Qt::AlignCenter); caption->setAlignment(Qt::AlignCenter);
+        l->addWidget(value); l->addWidget(caption); return w;
+    };
+    countRow->addWidget(countBlock(pendingCount,"待审核"),1);
+    countRow->addWidget(countBlock(approvedCount,"已通过"),1);
+    countRow->addWidget(countBlock(rejectedCount,"已驳回"),1);
+    body->addWidget(counts);
+    body->addWidget(button("申请提现",this,[this]{
+        editForm(this,api,"申请提现（审核后模拟到账）","POST","/wallet/withdrawals",
+            {{"amount","提现金额（元）"},{"destination","演示收款账户"}},
+            {{"idempotency_key",uid()},{"destination","演示钱包"}},[this]{refresh();});
+    },true));
+
+    QVBoxLayout *recordsLayout;
+    auto records=card("审核记录",&recordsLayout);
+    auto scroll=new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setMinimumHeight(300);
+    auto contentWidget=new QWidget;
+    auto rows=new QVBoxLayout(contentWidget);
+    rows->setContentsMargins(0,0,0,0); rows->setSpacing(8);
+    for (const auto &value : withdrawals) {
+        const auto record=value.toObject();
+        const auto status=text(record,"status");
+        const auto statusName=status=="pending"?"待审核":
+            ((status=="paid"||status=="approved")?"已通过":
+             (status=="rejected"?"已驳回":statusText(status)));
+        auto item=new QFrame;
+        item->setObjectName("withdrawalRecord");
+        item->setStyleSheet("QFrame#withdrawalRecord{background:#21152c;border:1px solid #3e2949;border-radius:12px;}");
+        auto line=new QHBoxLayout(item); line->setContentsMargins(13,10,13,10);
+        auto info=new QVBoxLayout; info->setSpacing(3);
+        info->addWidget(label("提现申请 · "+statusName,"font-size:12px;font-weight:600;"));
+        info->addWidget(label(localDateTime(text(record,"requested_at")),"font-size:10px;color:#957ba8;"));
+        const auto note=text(record,"review_note");
+        if (!note.isEmpty()) info->addWidget(label(note,"font-size:10px;color:#b3a0c2;"));
+        line->addLayout(info,1);
+        auto amount=label("¥"+money(number(record,"amount")),"font-size:15px;font-weight:600;color:#d983e1;");
+        amount->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
+        line->addWidget(amount);
+        rows->addWidget(item);
+    }
+    if (withdrawals.isEmpty()) rows->addWidget(emptyPanel("暂无提现记录","申请提现后，审核状态会显示在这里。","chart"));
+    rows->addStretch();
+    scroll->setWidget(contentWidget);
     recordsLayout->addWidget(scroll,1);
     body->addWidget(records,1);
 }
