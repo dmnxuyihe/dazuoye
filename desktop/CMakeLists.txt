@@ -4,15 +4,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-find_package(Qt6 6.5.3 REQUIRED COMPONENTS Widgets Network WebSockets Sql Svg Charts Test WebEngineWidgets WebChannel)
+find_package(Qt6 6.5.3 REQUIRED COMPONENTS Widgets Network WebSockets Sql Svg Charts Test WebEngineWidgets WebChannel Multimedia MultimediaWidgets)
 if(MSVC)
   add_compile_options(/utf-8 /W4)
 else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
-add_library(electra_common STATIC src/client.cpp src/client.h src/ui.cpp src/ui.h src/dialogs.cpp src/charger_picker.cpp src/avatar_editor.cpp src/station_map.cpp src/station_map.h src/station_recommendations.cpp src/station_recommendations.h src/draggable_bottom_sheet.cpp src/draggable_bottom_sheet.h src/visuals.cpp src/visuals.h resources.qrc)
+add_library(electra_common STATIC src/client.cpp src/client.h src/ui.cpp src/ui.h src/dialogs.cpp src/charger_picker.cpp src/avatar_editor.cpp src/avatar_capture_dialog.cpp src/avatar_capture_dialog.h src/station_map.cpp src/station_map.h src/station_recommendations.cpp src/station_recommendations.h src/draggable_bottom_sheet.cpp src/draggable_bottom_sheet.h src/visuals.cpp src/visuals.h resources.qrc)
 target_include_directories(electra_common PUBLIC src)
-target_link_libraries(electra_common PUBLIC Qt6::Widgets Qt6::Network Qt6::WebSockets Qt6::Sql Qt6::Svg Qt6::WebEngineWidgets Qt6::WebChannel)
+target_link_libraries(electra_common PUBLIC Qt6::Widgets Qt6::Network Qt6::WebSockets Qt6::Sql Qt6::Svg Qt6::WebEngineWidgets Qt6::WebChannel Qt6::Multimedia Qt6::MultimediaWidgets)
 set(ELECTRA_USER_SOURCES
   src/user_window.cpp
   src/user_home_map.cpp

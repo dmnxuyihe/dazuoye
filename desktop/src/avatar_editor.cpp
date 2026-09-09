@@ -1,4 +1,5 @@
 #include "avatar_editor.h"
+#include "avatar_capture_dialog.h"
 #include <QImageReader>
 
 QImage circularAvatarImage(const QImage &image, int size) {
@@ -69,13 +70,20 @@ static void populateAvatarEditor(QWidget *d, QVBoxLayout *l, ApiClient *api,
         QObject::connect(b,&QPushButton::clicked,d,[=]{choose(QImage(":/assets/"+QString(name)));});
     }
     l->addLayout(samples);choose(current.isNull()?QImage(":/assets/ev-photo.png"):current);
-    l->addWidget(button("选择本地图片",d,[=]{
+    auto imageSources = new QHBoxLayout;
+    imageSources->addWidget(button("打开相机拍照",d,[=]{
+        AvatarCaptureDialog capture(d);
+        if (capture.exec() == QDialog::Accepted && !capture.capturedImage().isNull())
+            choose(capture.capturedImage());
+    },true),1);
+    imageSources->addWidget(button("选择本地图片",d,[=]{
         auto path=QFileDialog::getOpenFileName(d,"选择头像",{},"图片 (*.png *.jpg *.jpeg)");if(path.isEmpty())return;
         QImageReader reader(path);reader.setAutoTransform(true);const auto size=reader.size();
         if(!size.isValid()||qint64(size.width())*size.height()>40000000||QFileInfo(path).size()>15*1024*1024){QMessageBox::warning(d,"图片过大","请选择 15 MB、4000 万像素以内的 PNG 或 JPEG 图片。");return;}
         reader.setScaledSize(size.scaled(1600,1600,Qt::KeepAspectRatio));auto image=reader.read();
         if(image.isNull()){QMessageBox::warning(d,"读取失败","无法读取该图片，请更换文件。");return;}choose(image);
-    }));
+    }),1);
+    l->addLayout(imageSources);
     auto transforms=row({button("旋转 90°",d,[=]{canvas->rotate();}),button("水平翻转",d,[=]{canvas->mirror();}),button("重置",d,reset)});
     for(auto b:transforms->findChildren<QPushButton *>()){b->setStyleSheet("QPushButton{padding:7px 4px;}");b->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Fixed);}
     l->addWidget(transforms);

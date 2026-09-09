@@ -6,6 +6,47 @@
 #include <utility>
 
 namespace {
+class SingleLineFitLabel final : public QLabel {
+  public:
+    SingleLineFitLabel(const QString &text, int maximumPixelSize, int minimumPixelSize,
+                       QFont::Weight weight = QFont::Normal, QWidget *parent = nullptr)
+        : QLabel(text, parent), maximumPixelSize(maximumPixelSize),
+          minimumPixelSize(minimumPixelSize) {
+        baseFont = font();
+        baseFont.setWeight(weight);
+        setAlignment(Qt::AlignCenter);
+        setWordWrap(false);
+        setMinimumWidth(0);
+        setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+        fitFont();
+    }
+
+  protected:
+    void resizeEvent(QResizeEvent *event) override {
+        QLabel::resizeEvent(event);
+        fitFont();
+    }
+
+  private:
+    void fitFont() {
+        const int availableWidth = contentsRect().width();
+        int pixelSize = maximumPixelSize;
+        QFont fitted = baseFont;
+        for (; pixelSize > minimumPixelSize; --pixelSize) {
+            fitted.setPixelSize(pixelSize);
+            if (availableWidth <= 0 || QFontMetrics(fitted).horizontalAdvance(text()) <= availableWidth)
+                break;
+        }
+        fitted.setPixelSize(qMax(minimumPixelSize, pixelSize));
+        setFont(fitted);
+        setFixedHeight(QFontMetrics(fitted).height() + 2);
+    }
+
+    QFont baseFont;
+    int maximumPixelSize;
+    int minimumPixelSize;
+};
+
 double distanceOf(const QJsonObject &station) {
     const auto value = station.value("distance_km");
     if (value.isNull() || value.isUndefined()) return std::numeric_limits<double>::max();
@@ -150,17 +191,27 @@ void StationRecommendations::rebuild() {
             auto metricRow = new QHBoxLayout(metrics);
             metricRow->setContentsMargins(0, 2, 0, 2);
             metricRow->setSpacing(10);
-            auto addMetric = [&](const QString &caption, const QString &metric) {
+            auto addMetric = [&](const QString &caption, const QString &metric,
+                                 const QString &objectPrefix = QString(),
+                                 int captionMaximumSize = 10, int captionMinimumSize = 8) {
                 auto cell = new QFrame; cell->setObjectName("metric-cell");
                 auto layout = new QVBoxLayout(cell); layout->setContentsMargins(4,0,4,0); layout->setSpacing(5);
-                layout->addWidget(label(caption,"color:#a991ba;font-size:10px;"),0,Qt::AlignHCenter);
-                layout->addWidget(label(metric,"color:#fff4ff;font-size:16px;font-weight:600;"),0,Qt::AlignHCenter);
+                auto captionLabel = new SingleLineFitLabel(caption, captionMaximumSize, captionMinimumSize);
+                auto metricLabel = new SingleLineFitLabel(metric, 16, 10, QFont::DemiBold);
+                captionLabel->setStyleSheet("color:#a991ba;");
+                metricLabel->setStyleSheet("color:#fff4ff;");
+                if (!objectPrefix.isEmpty()) {
+                    captionLabel->setObjectName(objectPrefix + "-caption");
+                    metricLabel->setObjectName(objectPrefix + "-value");
+                }
+                layout->addWidget(captionLabel);
+                layout->addWidget(metricLabel);
                 metricRow->addWidget(cell,1);
             };
             auto divider = [&] { auto line=new QFrame; line->setObjectName("metric-divider"); line->setFixedWidth(1); metricRow->addWidget(line); };
             addMetric("距离", distanceText(station)); divider();
             addMetric("空闲电桩", QString("%1/%2").arg(qRound(number(station,"available_count"))).arg(qRound(number(station,"charger_count")))); divider();
-            addMetric("基础价格", money(number(station,"unit_price"))+" 元/kWh");
+            addMetric("价格（/kWh）", money(number(station,"unit_price")) + " ¥", "base-price", 9, 7);
             detailLayout->addWidget(metrics);
             auto actions = new QHBoxLayout;
             auto choose=button("选择此充电站",detail,[]{},true);
