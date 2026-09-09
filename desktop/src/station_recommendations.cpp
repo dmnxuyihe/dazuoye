@@ -65,6 +65,7 @@ QString distanceText(const QJsonObject &station) {
 
 StationRecommendations::StationRecommendations(QWidget *parent) : QWidget(parent) {
     setObjectName("station-recommendations");
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     auto root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(8);
@@ -84,7 +85,7 @@ StationRecommendations::StationRecommendations(QWidget *parent) : QWidget(parent
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setFixedHeight(320);
+    scroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     scroll->setVisible(false);
     scroll->viewport()->setAttribute(Qt::WA_AcceptTouchEvents);
     QScroller::grabGesture(scroll->viewport(), QScroller::LeftMouseButtonGesture);
@@ -92,9 +93,8 @@ StationRecommendations::StationRecommendations(QWidget *parent) : QWidget(parent
     cards = new QVBoxLayout(host);
     cards->setContentsMargins(0, 0, 0, 4);
     cards->setSpacing(10);
-    cards->addStretch();
     scroll->setWidget(host);
-    root->addWidget(scroll);
+    root->addWidget(scroll, 1);
     connect(summary, &QPushButton::clicked, this, [this] {
         expanded = !expanded;
         scrollSelectionIntoView = expanded;

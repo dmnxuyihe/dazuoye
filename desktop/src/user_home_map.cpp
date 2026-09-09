@@ -86,8 +86,7 @@ void UserWindow::mapPage() {
     host->setBackground(map);
 
     auto recommendations = new StationRecommendations;
-    panel->addWidget(recommendations);
-    panel->addStretch();
+    panel->addWidget(recommendations, 1);
 
     auto visibleRows = std::make_shared<QJsonArray>();
     auto showStation = [=](const QString &id) {
