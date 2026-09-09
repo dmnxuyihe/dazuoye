@@ -693,7 +693,7 @@ void AdminWindow::stationsPage() {
     QVBoxLayout *left, *right;
     auto a = card("车辆与站点", &left);
     a->setMaximumWidth(370);
-    auto car = new ArtWidget(ArtWidget::Car);
+    auto car = new ArtWidget(ArtWidget::VerticalCar);
     car->setFixedHeight(210);
     left->addWidget(car);
     for (const auto &v : stations) {
@@ -1153,7 +1153,7 @@ void AdminWindow::forecastPage() {
                             QString("经验范围测试覆盖率 %1%").arg(number(d, "test_coverage")))}));
         QVBoxLayout *chartLayout;
         auto box = card("充电需求趋势 · 最近48小时与未来24小时", &chartLayout);
-        auto chart = baseChart("横轴：日期与小时　　纵轴：每小时充电电量（kWh）");
+        auto chart = baseChart("");
         auto a = new QLineSeries;
         a->setName("历史");
         auto b = new QLineSeries;

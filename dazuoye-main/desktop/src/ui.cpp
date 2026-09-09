@@ -563,29 +563,42 @@ void ArtWidget::paintEvent(QPaintEvent *) {
         write(QRectF(w - 82, h - 21, 80, 18), "演示车辆", 9, QColor("#766184"));
         return;
     }
-    if (kind == Car || kind == TopCar) {
+    if (kind == Car || kind == VerticalCar || kind == TopCar) {
         QPixmap image(":/assets/" +
-                      QString(kind == Car ? "admin-xray-car.png" : "ev-top-photo.png"));
+                      QString(kind == TopCar ? "ev-top-photo.png" : "admin-xray-car.png"));
+        if (kind == VerticalCar)
+            image = image.transformed(QTransform().rotate(90), Qt::SmoothTransformation);
         auto size = image.size().scaled(QSize(width() - 4, height() - 4), Qt::KeepAspectRatio);
         QRectF target((w - size.width()) / 2, (h - size.height()) / 2, size.width(), size.height());
         p.drawPixmap(target, image, image.rect());
-        if (kind == Car) {
+        if (kind == Car || kind == VerticalCar) {
             QPainterPath capsule;
             capsule.addRoundedRect(target.adjusted(4, 6, -4, -6), target.height() / 2,
                                    target.height() / 2);
             p.save();
             p.setClipPath(capsule);
-            QLinearGradient tint(target.center().x(), 0, target.right(), 0);
+            QLinearGradient tint = kind == VerticalCar
+                                       ? QLinearGradient(0, target.center().y(), 0, target.bottom())
+                                       : QLinearGradient(target.center().x(), 0, target.right(), 0);
             tint.setColorAt(0, QColor("#b0073039"));
             tint.setColorAt(1, QColor("#c002a0c7"));
-            p.fillRect(
-                QRectF(target.center().x() + 14, target.top(), target.width() / 2, target.height()),
-                tint);
+            const QRectF tinted = kind == VerticalCar
+                                      ? QRectF(target.left(), target.center().y() + 10,
+                                               target.width(), target.height() / 2)
+                                      : QRectF(target.center().x() + 14, target.top(),
+                                               target.width() / 2, target.height());
+            p.fillRect(tinted, tint);
             p.setPen(QPen(QColor("#72f5ed"), 1));
-            p.drawLine(QPointF(target.center().x() + 14, target.top()),
-                       QPointF(target.center().x() + 14, target.bottom()));
-            p.translate(target.right() - target.width() * .2, target.center().y());
-            p.rotate(-90);
+            if (kind == VerticalCar) {
+                p.drawLine(QPointF(target.left(), target.center().y() + 10),
+                           QPointF(target.right(), target.center().y() + 10));
+                p.translate(target.center().x(), target.bottom() - target.height() * .2);
+            } else {
+                p.drawLine(QPointF(target.center().x() + 14, target.top()),
+                           QPointF(target.center().x() + 14, target.bottom()));
+                p.translate(target.right() - target.width() * .2, target.center().y());
+                p.rotate(-90);
+            }
             QFont f = font();
             f.setPixelSize(33);
             f.setWeight(QFont::DemiBold);

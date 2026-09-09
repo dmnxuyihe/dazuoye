@@ -51,7 +51,7 @@ QWidget *picture(const QString &name, int height);
 class ArtWidget : public QWidget {
     Q_OBJECT
   public:
-    enum Kind { Car, TopCar, Ring, Gauge, Spark, Flow, UserHero };
+    enum Kind { Car, VerticalCar, TopCar, Ring, Gauge, Spark, Flow, UserHero };
     ArtWidget(Kind kind, QWidget *parent = nullptr);
     void setValue(double v, const QString &caption = {});
     void setValues(const QList<double> &values, const QStringList &labels = {});
