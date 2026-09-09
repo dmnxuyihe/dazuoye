@@ -12,11 +12,18 @@ class StationRecommendations : public QWidget {
 
   signals:
     void stationSelected(QString stationId);
+    void stationChosen(QString stationId);
+    void navigationRequested(QString stationId);
 
   private:
     void rebuild();
     QString selected;
     QJsonArray rows;
     QVBoxLayout *cards;
+    QVBoxLayout *detailLayout;
     QLabel *hint;
+    QPushButton *summary;
+    QFrame *detail;
+    QScrollArea *scroll;
+    bool expanded = false;
 };

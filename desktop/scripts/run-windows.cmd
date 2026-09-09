@@ -19,22 +19,22 @@ set "BUILD_DIR=%PROJECT_ROOT%\.runtime\qt-build-windows"
 if defined ELECTRA_QT_ROOT (
   set "QT_ROOT=%ELECTRA_QT_ROOT%"
 ) else (
-  set "QT_ROOT=G:\QT\6.5.3\msvc2019_64"
+  set "QT_ROOT=D:\SoftWare\Qt\6.5.3\msvc2019_64"
 )
 if defined ELECTRA_CMAKE (
   set "CMAKE=%ELECTRA_CMAKE%"
 ) else (
-  set "CMAKE=G:\QT\Tools\CMake_64\bin\cmake.exe"
+  set "CMAKE=D:\SoftWare\Qt\Tools\CMake_64\bin\cmake.exe"
 )
 if defined ELECTRA_NINJA (
   set "NINJA=%ELECTRA_NINJA%"
 ) else (
-  set "NINJA=G:\QT\Tools\Ninja\ninja.exe"
+  set "NINJA=D:\SoftWare\Qt\Tools\Ninja\ninja.exe"
 )
 if defined ELECTRA_VCVARS64 (
   set "VCVARS64=%ELECTRA_VCVARS64%"
 ) else (
-  set "VCVARS64=G:\Visual Studio2022\Product\VC\Auxiliary\Build\vcvars64.bat"
+  set "VCVARS64=D:\SoftWare\VSdownload\VC\Auxiliary\Build\vcvars64.bat"
 )
 if defined ELECTRA_API_URL (
   set "API_URL=%ELECTRA_API_URL%"
@@ -47,15 +47,17 @@ if not exist "%CMAKE%" goto :missing_cmake
 if not exist "%NINJA%" goto :missing_ninja
 if not exist "%VCVARS64%" goto :missing_msvc
 
-call "%VCVARS64%" >nul
+call "%VCVARS64%" -vcvars_ver=14.44 >nul
 if errorlevel 1 exit /b %errorlevel%
 set "PATH=%QT_ROOT%\bin;%PATH%"
 
-if not exist "%BUILD_DIR%\build.ninja" (
-  echo [Electra] Configuring Qt project...
-  "%CMAKE%" -S "%SOURCE_DIR%" -B "%BUILD_DIR%" -G Ninja "-DCMAKE_MAKE_PROGRAM=%NINJA%" "-DCMAKE_PREFIX_PATH=%QT_ROOT%" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-  if errorlevel 1 exit /b %errorlevel%
-)
+echo [Electra] Configuring latest source tree...
+"%CMAKE%" -S "%SOURCE_DIR%" -B "%BUILD_DIR%" -G Ninja "-DCMAKE_MAKE_PROGRAM=%NINJA%" "-DCMAKE_PREFIX_PATH=%QT_ROOT%" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+if errorlevel 1 exit /b %errorlevel%
+
+echo [Electra] Closing previous %ROLE% client...
+rem Close old copies before linking; Windows does not allow replacing a running exe.
+powershell.exe -NoProfile -NonInteractive -Command "Get-Process 'electra-%ROLE%' -ErrorAction SilentlyContinue | Stop-Process -Force"
 
 echo [Electra] Building %ROLE% client...
 "%CMAKE%" --build "%BUILD_DIR%" --target "electra-%ROLE%" --parallel 4
@@ -63,7 +65,7 @@ if errorlevel 1 exit /b %errorlevel%
 
 if not exist "%PROJECT_ROOT%\.runtime" mkdir "%PROJECT_ROOT%\.runtime"
 echo [Electra] Checking data service %API_URL%...
-powershell.exe -NoProfile -NonInteractive -Command "try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%API_URL%/health' -TimeoutSec 15; if ($response.StatusCode -ne 200) { exit 1 } } catch { exit 1 }"
+powershell.exe -NoProfile -NonInteractive -Command "try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%API_URL%/health' -TimeoutSec 15; if ($response.StatusCode -ne 200) { Write-Host ('HTTP status: ' + $response.StatusCode); exit 1 }; Write-Host ('[Electra] Service ready: HTTP ' + $response.StatusCode) } catch { Write-Host ('[Electra] Service error: ' + $_.Exception.Message); exit 1 }"
 if errorlevel 1 (
   echo [Electra] Data service is unavailable. Check the network or set ELECTRA_API_URL.
   exit /b 4

@@ -27,7 +27,7 @@ class UserWindow : public DesktopWindow {
     QJsonArray stations, chargers, orders, ledger, withdrawals;
     QJsonObject me, active, analytics;
     QString selectedStation;
-    int statsPeriod = 0, tariffMode = 0, chargeMode = 0, historyFilter = 0, walletFilter = 0;
+    int statsPeriod = 0, tariffMode = 0, historyFilter = 0, walletFilter = 0;
     QString scheduleOrigin = "stats";
     QJsonObject historyData;
     ApiClient *historyApi;

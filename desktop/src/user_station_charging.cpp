@@ -23,14 +23,6 @@ void UserWindow::stationPage() {
         body->addWidget(emptyPanel("请选择站点", "从地图选择站点后查看充电接口", "pin"));
         return;
     }
-    auto modes = new Segments({"经济模式", "快速充电"}, chargeMode);
-    connect(modes, &Segments::changed, this, [this](int n) {
-        chargeMode = n;
-        navigate("station");
-    });
-    body->addWidget(modes);
-    body->addWidget(button("查看分时价格",this,[this]{navigate("schedule");}));
-    body->addWidget(label("经济模式优先慢充，快速模式仅可选择空闲快充；下方展示本站全部电桩。", muted));
     QVBoxLayout *life;
     auto energy = card(me.isEmpty()?"我的车辆":text(me,"vehicle_name","我的车辆"), &life);
     energy->setStyleSheet("QFrame#card{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 "
@@ -50,10 +42,29 @@ void UserWindow::stationPage() {
     body->addWidget(energy);
     QVBoxLayout *selectionLayout;
     auto selectionBox=card("选择电桩",&selectionLayout);
-    selectionLayout->addWidget(limit);
-    selectionLayout->addWidget(label("绿：空闲  橙：充电中  蓝：已预约  红：故障/停用","font-size:10px;color:#c6b5d1;"));
+    auto statusFilter = new QComboBox;
+    statusFilter->setObjectName("charger-status-filter");
+    statusFilter->addItem("全部状态", "");
+    statusFilter->addItem("空闲", "available");
+    statusFilter->addItem("充电中", "charging");
+    statusFilter->addItem("已预约", "reserved");
+    statusFilter->addItem("故障/停用", "faulted");
+    auto kindFilter = new QComboBox;
+    kindFilter->setObjectName("charger-kind-filter");
+    kindFilter->addItem("全部快慢充", "");
+    kindFilter->addItem("快充", "fast");
+    kindFilter->addItem("慢充", "slow");
+    auto filters = new QWidget;
+    filters->setObjectName("charger-filters");
+    auto filterLayout = new QHBoxLayout(filters);
+    filterLayout->setContentsMargins(0, 0, 0, 0);
+    filterLayout->setSpacing(8);
+    filterLayout->addWidget(limit, 1);
+    filterLayout->addWidget(statusFilter, 1);
+    filterLayout->addWidget(kindFilter, 1);
+    selectionLayout->addWidget(filters);
     auto picker=new ChargerPicker;selectionLayout->addWidget(picker);
-    auto pickerState=label("正在读取电桩状态…","font-size:11px;color:#bca8ca;");selectionLayout->addWidget(pickerState);
+    auto pickerState=label("","font-size:11px;color:#bca8ca;");selectionLayout->addWidget(pickerState);
     body->addWidget(selectionBox);
     QVBoxLayout *details;
     auto box = card("", &details);
@@ -72,6 +83,15 @@ void UserWindow::stationPage() {
     el->addWidget(
         detailLine("bolt", "基础单价（分时表优先）", "¥" + money(number(station, "unit_price")) + " / kWh"));
     amountRow("费用范围（以实际账单为准）", estimateTotal);
+    auto tariffRow = new QHBoxLayout;
+    tariffRow->addStretch();
+    auto tariff = button("查看分时价格", this, [this] { navigate("schedule"); });
+    tariff->setProperty("quiet", true);
+    tariff->setMinimumHeight(30);
+    tariff->setMaximumWidth(128);
+    tariff->setStyleSheet("padding:5px 10px;font-size:11px;min-height:20px;");
+    tariffRow->addWidget(tariff);
+    el->addLayout(tariffRow);
     details->addWidget(estimated);
     auto updateEstimate = [=] {
         double kwh = qMax(0., (limit->currentData().toInt() - batterySoc()) * (me.contains("battery_kwh") ? number(me,"battery_kwh") : 60.) / 100.);
@@ -85,8 +105,7 @@ void UserWindow::stationPage() {
     connect(limit, &QComboBox::activated, box, [=](int) { updateEstimate(); });
     updateEstimate();
 
-    auto hint =
-        label("电量按绑定车辆容量估算，服务端按实际时段价格生成账单。", "font-size:10px;color:#9f87b1;");
+    auto hint = label("", "font-size:10px;color:#ef9db4;");
     details->addWidget(hint);
     auto reserve = new QPushButton("ϟ  预约并准备充电");
     reserve->setProperty("primary", true);
@@ -128,15 +147,21 @@ void UserWindow::stationPage() {
     auto pending=std::make_shared<bool>(false);
     auto previous=std::make_shared<QJsonArray>();
     auto readonly=std::make_shared<bool>(true);
+    auto applyPickerFilters = [=] {
+        picker->setChargers(*previous, *readonly, false,
+                            statusFilter->currentData().toString(), kindFilter->currentData().toString());
+    };
+    connect(statusFilter, &QComboBox::currentIndexChanged, picker, [=](int) { applyPickerFilters(); });
+    connect(kindFilter, &QComboBox::currentIndexChanged, picker, [=](int) { applyPickerFilters(); });
     auto load=[=]{
         if(*pending)return;
         *pending=true;
         api->get("/public/stations/"+stationId+"/chargers",box,[=](const Reply &r){
             *pending=false;
-            if(!r.ok){picker->setChargers(*previous,true,chargeMode==1);*readonly=true;pickerState->setText("状态读取失败，暂不可预约："+r.error);return;}
+            if(!r.ok){*readonly=true;applyPickerFilters();pickerState->setText("状态读取失败，暂不可预约："+r.error);return;}
             const auto items=r.data.array();
-            if(items!=*previous || r.cached!=*readonly){picker->setChargers(items,r.cached,chargeMode==1);*previous=items;*readonly=r.cached;}
-            pickerState->setText(r.cached?"离线缓存 · 暂不可预约":items.isEmpty()?"本站尚未配置电桩":picker->selectedId().isEmpty()?"请选择空闲电桩；若均不可用，请切换模式或站点。":"已选电桩以加粗边框标记 · 状态每秒更新");
+            if(items!=*previous || r.cached!=*readonly){*previous=items;*readonly=r.cached;applyPickerFilters();}
+            pickerState->setText(r.cached?"离线缓存，暂不可预约":items.isEmpty()?"本站尚未配置电桩":"");
         });
     };
     auto timer=new QTimer(box);connect(timer,&QTimer::timeout,box,load);timer->start(1000);load();
@@ -208,4 +233,3 @@ void UserWindow::orderCommand(const QString &action) {
                 navigate("charging");
             });
 }
-

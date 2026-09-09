@@ -78,18 +78,6 @@ void UserWindow::mapPage() {
 
     auto recommendations = new StationRecommendations;
     body->addWidget(recommendations);
-    auto detail = new QFrame;
-    detail->setObjectName("station-sheet");
-    detail->setStyleSheet("QFrame#station-sheet{background:#251733;border:1px solid #50305f;border-radius:16px;}");
-    auto details = new QVBoxLayout(detail);
-    auto name = label("", "font-size:20px;font-weight:600;");
-    auto meta = label("", "color:#d8c4e5;font-size:12px;");
-    auto actions = new QHBoxLayout;
-    auto chargeHere = button("选择此站并充电", this, [] {}, true);
-    auto go = button("导航到此站", this, [] {});
-    actions->addWidget(chargeHere, 2); actions->addWidget(go, 1);
-    details->addWidget(name); details->addWidget(meta); details->addLayout(actions);
-    body->addWidget(detail);
 
     auto visibleRows = std::make_shared<QJsonArray>();
     auto showStation = [=](const QString &id) {
@@ -99,21 +87,15 @@ void UserWindow::mapPage() {
         for (const auto &value : *visibleRows) {
             const auto station = value.toObject();
             if (text(station, "id") != id) continue;
-            name->setText(text(station, "name"));
-            const bool located = !station.value("distance_km").isNull() &&
-                                 !station.value("distance_km").isUndefined();
-            meta->setText(QString("%1%2  ·  空闲 %3/%4")
-                .arg(located ? money(number(station, "distance_km")) + " km  ·  " : "")
-                .arg(text(station, "address"))
-                .arg(qRound(number(station, "available_count")))
-                .arg(qRound(number(station, "charger_count"))));
             break;
         }
     };
     connect(map, &StationMap::stationSelected, recommendations, showStation);
-    connect(recommendations, &StationRecommendations::stationSelected, detail, showStation);
-    connect(go, &QPushButton::clicked, map, [=] { map->navigateToStation(selectedStation); });
-    connect(chargeHere, &QPushButton::clicked, this, [this] { navigate("station"); });
+    connect(recommendations, &StationRecommendations::stationSelected, map, showStation);
+    connect(recommendations, &StationRecommendations::navigationRequested, map,
+            [=](const QString &id) { map->navigateToStation(id); });
+    connect(recommendations, &StationRecommendations::stationChosen, this,
+            [this](const QString &id) { selectedStation = id; navigate("station"); });
 
     auto filtered = [=] {
         *visibleRows = {};
@@ -138,7 +120,6 @@ void UserWindow::mapPage() {
         }
         recommendations->setStations(*visibleRows, selectedStation);
         map->setStations(*visibleRows, selectedStation);
-        detail->setVisible(!visibleRows->isEmpty());
         if (!visibleRows->isEmpty()) showStation(selectedStation);
     };
     auto generation = std::make_shared<int>(0);

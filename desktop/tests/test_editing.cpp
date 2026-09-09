@@ -75,6 +75,19 @@ class EditingTest:public QObject {
         }
         QDir().mkpath(".runtime/qt-cards-avatar/screenshots");picker.grab().save(".runtime/qt-cards-avatar/screenshots/charger-cards.png");
     }
+    void chargerFilters() {
+        ChargerPicker picker;
+        QJsonArray data{
+            QJsonObject{{"id","fast-free"},{"code","F-01"},{"kind","fast"},{"status","available"}},
+            QJsonObject{{"id","slow-free"},{"code","S-01"},{"kind","slow"},{"status","available"}},
+            QJsonObject{{"id","fast-busy"},{"code","F-02"},{"kind","fast"},{"status","charging"}}
+        };
+        picker.setChargers(data, false, false, "available", "slow");
+        QVERIFY(picker.findChild<QPushButton *>("charger-slow-free"));
+        QVERIFY(!picker.findChild<QPushButton *>("charger-fast-free"));
+        QVERIFY(!picker.findChild<QPushButton *>("charger-fast-busy"));
+        QCOMPARE(picker.selectedId(), QString("slow-free"));
+    }
     void compactAvatarDialog() {
         QTemporaryDir temp;CacheStore cache(temp.filePath("cache.sqlite"));ApiClient api(QUrl("http://127.0.0.1:1"),&cache);
         QWidget owner;owner.resize(360,700);owner.show();showAvatarEditor(&owner,&api,[](const QJsonObject &){});
