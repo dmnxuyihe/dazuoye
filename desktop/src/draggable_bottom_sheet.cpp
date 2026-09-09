@@ -58,13 +58,16 @@ void DraggableBottomSheet::moveSheet(int y) {
     sheet->raise();
 }
 
-void DraggableBottomSheet::snap(Position target) {
+void DraggableBottomSheet::snap(Position target, bool userInitiated) {
+    const bool enteredExpanded = target == Expanded && position != Expanded;
     position = target;
     animation->stop();
     animation->setStartValue(sheet->geometry());
     animation->setEndValue(QRect(8, yFor(target), qMax(0, width() - 16),
                                  height() - yFor(target) + 22));
     animation->start();
+    if (userInitiated && enteredExpanded)
+        emit userExpanded();
 }
 
 void DraggableBottomSheet::resizeEvent(QResizeEvent *event) {
@@ -93,14 +96,14 @@ bool DraggableBottomSheet::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::MouseButtonRelease && dragging) {
         dragging = false;
         const int delta = sheet->y() - pressY;
-        if (delta < -35) snap(position == Collapsed ? Resting : Expanded);
-        else if (delta > 35) snap(position == Expanded ? Resting : Collapsed);
+        if (delta < -35) snap(position == Collapsed ? Half : Expanded, true);
+        else if (delta > 35) snap(position == Expanded ? Half : Collapsed, true);
         else {
-            const QList<Position> states{Collapsed, Resting, Expanded};
+            const QList<Position> states{Collapsed, Half, Expanded};
             auto nearest = states.first();
             for (auto state : states)
                 if (qAbs(sheet->y() - yFor(state)) < qAbs(sheet->y() - yFor(nearest))) nearest = state;
-            snap(nearest);
+            snap(nearest, true);
         }
         return true;
     }

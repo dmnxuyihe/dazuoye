@@ -87,6 +87,12 @@ void UserWindow::mapPage() {
 
     auto recommendations = new StationRecommendations;
     panel->addWidget(recommendations, 1);
+    connect(host, &DraggableBottomSheet::userExpanded,
+            recommendations, &StationRecommendations::expandPreferred);
+    // Keep model selection in sync without going through stationSelected, whose
+    // existing handler intentionally moves the map camera.
+    connect(recommendations, &StationRecommendations::preferredStationExpanded,
+            this, [this](const QString &id) { selectedStation = id; });
 
     auto visibleRows = std::make_shared<QJsonArray>();
     auto showStation = [=](const QString &id) {
@@ -95,6 +101,7 @@ void UserWindow::mapPage() {
     };
     connect(map, &StationMap::stationSelected, recommendations, [=](const QString &id) {
         showStation(id);
+        recommendations->expandStation(id);
         host->expand();
     });
     connect(recommendations, &StationRecommendations::stationSelected, map, [=](const QString &id) {

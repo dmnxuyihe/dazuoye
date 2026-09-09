@@ -9,11 +9,15 @@ class StationRecommendations : public QWidget {
     explicit StationRecommendations(QWidget *parent = nullptr);
     void setStations(const QJsonArray &stations, const QString &selectedId);
     void setSelected(const QString &stationId);
+    void expandStation(const QString &stationId);
+    void expandPreferred();
+    QString expandedStationId() const { return expandedStation; }
 
   signals:
     void stationSelected(QString stationId);
     void stationChosen(QString stationId);
     void navigationRequested(QString stationId);
+    void preferredStationExpanded(QString stationId);
 
   private:
     void rebuild();
@@ -23,6 +27,7 @@ class StationRecommendations : public QWidget {
     QLabel *hint;
     QPushButton *summary;
     QScrollArea *scroll;
-    bool expanded = false;
+    bool listExpanded = false;
+    QString expandedStation;
     bool scrollSelectionIntoView = false;
 };

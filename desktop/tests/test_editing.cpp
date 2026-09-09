@@ -2,6 +2,8 @@
 #include "avatar_capture_dialog.h"
 #include "charger_picker.h"
 #include "face_image_processor.h"
+#include "draggable_bottom_sheet.h"
+#include "station_recommendations.h"
 #include <QtTest>
 #include <QMediaDevices>
 #include <QCameraDevice>
@@ -101,6 +103,50 @@ class EditingTest:public QObject {
         QVERIFY(!picker.findChild<QPushButton *>("charger-fast-free"));
         QVERIFY(!picker.findChild<QPushButton *>("charger-fast-busy"));
         QCOMPARE(picker.selectedId(), QString("slow-free"));
+    }
+    void recommendationExpansionStateIsIndependent() {
+        StationRecommendations recommendations;
+        recommendations.resize(380, 560);
+        const QJsonArray rows{
+            QJsonObject{{"id","nearest"},{"name","Nearest"},{"distance_km",0.4}},
+            QJsonObject{{"id","selected"},{"name","Selected"},{"distance_km",1.2}}
+        };
+        recommendations.setStations(rows, "selected");
+        QVERIFY(recommendations.expandedStationId().isEmpty());
+        recommendations.expandPreferred();
+        QCOMPARE(recommendations.expandedStationId(), QString("selected"));
+        recommendations.setSelected("nearest");
+        // Selection/data updates must not replace an already expanded detail.
+        QCOMPARE(recommendations.expandedStationId(), QString("selected"));
+
+        StationRecommendations nearestFallback;
+        nearestFallback.setStations(rows, {});
+        nearestFallback.expandPreferred();
+        QCOMPARE(nearestFallback.expandedStationId(), QString("nearest"));
+        nearestFallback.expandPreferred();
+        QCOMPARE(nearestFallback.expandedStationId(), QString("nearest"));
+    }
+    void sheetReportsOnlyUserExpansion() {
+        DraggableBottomSheet sheet;
+        sheet.resize(400, 700);
+        sheet.show();
+        QSignalSpy userExpanded(&sheet, &DraggableBottomSheet::userExpanded);
+        sheet.expand();
+        QTest::qWait(300);
+        QCOMPARE(userExpanded.size(), 0);
+
+        // Return to the resting state with a real downward drag, then drag up.
+        auto grab = sheet.findChild<QWidget *>("sheet-grab-area");
+        QVERIFY(grab);
+        const QPoint center = grab->rect().center();
+        QTest::mousePress(grab, Qt::LeftButton, {}, center);
+        QTest::mouseMove(grab, center + QPoint(0, 80));
+        QTest::mouseRelease(grab, Qt::LeftButton, {}, center + QPoint(0, 80));
+        QTest::qWait(300);
+        QTest::mousePress(grab, Qt::LeftButton, {}, center);
+        QTest::mouseMove(grab, center - QPoint(0, 80));
+        QTest::mouseRelease(grab, Qt::LeftButton, {}, center - QPoint(0, 80));
+        QTRY_COMPARE(userExpanded.size(), 1);
     }
     void compactAvatarDialog() {
         QTemporaryDir temp;CacheStore cache(temp.filePath("cache.sqlite"));ApiClient api(QUrl("http://127.0.0.1:1"),&cache);

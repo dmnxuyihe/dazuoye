@@ -96,10 +96,27 @@ StationRecommendations::StationRecommendations(QWidget *parent) : QWidget(parent
     scroll->setWidget(host);
     root->addWidget(scroll, 1);
     connect(summary, &QPushButton::clicked, this, [this] {
-        expanded = !expanded;
-        scrollSelectionIntoView = expanded;
+        listExpanded = !listExpanded;
+        if (listExpanded && !selected.isEmpty()) expandedStation = selected;
+        if (!listExpanded) expandedStation.clear();
+        scrollSelectionIntoView = listExpanded;
         rebuild();
     });
+}
+
+void StationRecommendations::expandPreferred() {
+    // Sheet height and card detail are deliberately separate states. A downward
+    // sheet drag never calls this method and therefore never collapses a card.
+    if (!expandedStation.isEmpty() || rows.isEmpty()) return;
+    bool selectedExists = false;
+    for (const auto &value : rows)
+        if (text(value.toObject(), "id") == selected) { selectedExists = true; break; }
+    if (!selectedExists) selected = text(rows.first().toObject(), "id");
+    expandedStation = selected;
+    listExpanded = true;
+    scrollSelectionIntoView = true;
+    rebuild();
+    emit preferredStationExpanded(selected);
 }
 
 void StationRecommendations::setStations(const QJsonArray &stations, const QString &selectedId) {
@@ -111,12 +128,24 @@ void StationRecommendations::setStations(const QJsonArray &stations, const QStri
     rows = {};
     for (const auto &station : sorted) rows.append(station);
     selected = selectedId;
+    if (!expandedStation.isEmpty() && !std::any_of(rows.begin(), rows.end(), [this](const QJsonValue &value) {
+            return text(value.toObject(), "id") == expandedStation;
+        })) expandedStation.clear();
     rebuild();
 }
 
 void StationRecommendations::setSelected(const QString &stationId) {
     if (selected == stationId) return;
     selected = stationId;
+    rebuild();
+}
+
+void StationRecommendations::expandStation(const QString &stationId) {
+    if (stationId.isEmpty()) return;
+    selected = stationId;
+    expandedStation = stationId;
+    listExpanded = true;
+    scrollSelectionIntoView = true;
     rebuild();
 }
 
@@ -134,9 +163,9 @@ void StationRecommendations::rebuild() {
             .arg(qRound(number(selectedStation, "available_count")))
             .arg(qRound(number(selectedStation, "charger_count")))
             .arg(money(number(selectedStation, "unit_price")))
-            .arg(expanded ? "⌃" : "⌄"));
-    summary->setVisible(!expanded);
-    scroll->setVisible(expanded && !rows.isEmpty());
+            .arg(listExpanded ? "⌃" : "⌄"));
+    summary->setVisible(!listExpanded);
+    scroll->setVisible(listExpanded && !rows.isEmpty());
     QPointer<QWidget> activeCard;
     for (const auto &value : rows) {
         const auto station = value.toObject();
@@ -162,20 +191,22 @@ void StationRecommendations::rebuild() {
             "QPushButton#recommendation-card:checked{background:#3b1d51;border:2px solid #d477ee;}"
             "QPushButton#recommendation-card:focus{outline:none;border-color:#e9a2f5;}");
         connect(card, &QPushButton::clicked, this, [this, id] {
-            if (selected == id && expanded) {
-                expanded = false;
+            if (expandedStation == id) {
+                expandedStation.clear();
+                listExpanded = false;
                 rebuild();
                 return;
             }
             selected = id;
-            expanded = true;
+            expandedStation = id;
+            listExpanded = true;
             scrollSelectionIntoView = true;
             emit stationSelected(id);
             QTimer::singleShot(0, this, [this] { rebuild(); });
         });
         cards->addWidget(card);
         if (active) activeCard = card;
-        if (active && expanded) {
+        if (id == expandedStation) {
             auto detail = new QFrame;
             detail->setObjectName("station-expanded-card");
             detail->setStyleSheet(
