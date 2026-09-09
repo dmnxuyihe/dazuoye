@@ -838,7 +838,8 @@ void AdminWindow::ordersPage() {
             continue;
         ++count;
         auto info = label(text(o, "station_name") + "   ·   " + text(o, "charger_code") + "\n" +
-                              maskedPhone(text(o, "phone")) + "   " + text(o, "reserved_at"),
+                              maskedPhone(text(o, "phone")) + "   " +
+                                  localDateTime(text(o, "reserved_at")),
                           "font-size:13px;");
         auto status = label(statusText(text(o, "status")), "color:#c992e1;");
         auto cost = label(money(number(o, "energy_kwh")) + " kWh\n¥" + money(number(o, "amount")));
@@ -1009,7 +1010,7 @@ void AdminWindow::auditPage() {
             r->addLayout(textcol, 1);
             r->addWidget(label(localTime.time().toString("HH:mm:ss"), "color:#a88eba;font-size:11px;"));
             r->addWidget(button("查看 ↗", content, [=] {
-                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + text(o, "created_at") +
+                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + localDateTime(text(o, "created_at")) +
                                        "\n\n对象  " + text(o, "target_type") + "\n" +
                                        text(o, "target_id"));
                 QJsonObject details{{"操作编号",text(o,"id")}, {"操作名称",actionLabel(action)},
@@ -1424,17 +1425,23 @@ void AdminWindow::manager(const QString &kind) {
             table->setColumnCount(columns.size());
             table->setHorizontalHeaderLabels(headings);
             table->setRowCount(items->size());
-            for (int i = 0; i < items->size(); i++)
-                for (int j = 0; j < columns.size(); j++)
-            table->setItem(
-                        i, j,
-                        new QTableWidgetItem(kind == "users" && columns[j] == "id"
-                            ? userNumber((*items)[i].toObject())
-                            : kind == "users" && columns[j] == "phone"
-                                ? maskedPhone(text((*items)[i].toObject(), "phone"))
-                            : kind == "stations" && columns[j] == "id"
-                                ? stationNumber(stations, text((*items)[i].toObject(), "id"))
-                            : statusText(text((*items)[i].toObject(), columns[j]))));
+            for (int i = 0; i < items->size(); i++) {
+                const auto item = (*items)[i].toObject();
+                for (int j = 0; j < columns.size(); j++) {
+                    QString value;
+                    if (kind == "users" && columns[j] == "id")
+                        value = userNumber(item);
+                    else if (kind == "users" && columns[j] == "phone")
+                        value = maskedPhone(text(item, "phone"));
+                    else if (kind == "stations" && columns[j] == "id")
+                        value = stationNumber(stations, text(item, "id"));
+                    else if (columns[j].endsWith("_at"))
+                        value = localDateTime(text(item, columns[j]));
+                    else
+                        value = statusText(text(item, columns[j]));
+                    table->setItem(i, j, new QTableWidgetItem(value));
+                }
+            }
             auto header = table->horizontalHeader();
             header->setStretchLastSection(false);
             for (int j = 0; j < columns.size(); ++j)

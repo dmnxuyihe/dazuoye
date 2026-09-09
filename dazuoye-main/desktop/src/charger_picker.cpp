@@ -4,12 +4,15 @@ ChargerPicker::ChargerPicker(QWidget *parent) : QWidget(parent), grid(new QGridL
     setObjectName("charger-picker");
     grid->setContentsMargins(0,0,0,0);grid->setSpacing(10);grid->setAlignment(Qt::AlignTop);
 }
-void ChargerPicker::setChargers(const QJsonArray &items, bool readOnly, bool fastOnly) {
+void ChargerPicker::setChargers(const QJsonArray &items, bool readOnly, bool fastOnly,
+                                const QString &statusFilter, const QString &kindFilter) {
     for(auto b:buttons)delete b;
     buttons.clear();
     QString first, slow;
     for(auto value:items) {
         auto o=value.toObject();const auto state=text(o,"status");
+        if (!statusFilter.isEmpty() && state != statusFilter) continue;
+        if (!kindFilter.isEmpty() && text(o,"kind") != kindFilter) continue;
         const bool available=state=="available" && !readOnly && (!fastOnly || text(o,"kind")=="fast");
         const auto id=text(o,"id");
         if(available) {if(first.isEmpty())first=id;if(slow.isEmpty()&&text(o,"kind")=="slow")slow=id;}

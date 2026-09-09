@@ -174,6 +174,8 @@ void ApiClient::request(const QString &method, const QString &path, const QJsonO
             cache->put(key, r.data);
         if (!r.ok) {
             r.error = errorMessage(bytes, r.status);
+            if (!network && !reply->errorString().isEmpty())
+                r.error += "（" + reply->errorString() + "）";
             if (!network && method == "GET" && cacheRead) {
                 auto saved = cache->get(key);
                 if (saved.ok)

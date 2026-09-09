@@ -33,6 +33,21 @@ async def seed_demo(pool: asyncpg.Pool, *, cities_only: bool = False) -> None:
         stations.append((uuid5(NAMESPACE_URL, "electra:demo-city:" + city),
                          city + "演示充电站", city + " · 模拟站点（非真实营业地址）",
                          Decimal(lon), Decimal(lat), Decimal("1.20")))
+    # Give every demo region several nearby choices. Stable UUIDs make this
+    # safe to apply to both new and existing databases.
+    for key, name, address, lon, lat, price in [
+        ("shanghai-hongqiao", "\u4e0a\u6d77\u8679\u6865\u5145\u7535\u7ad9", "\u4e0a\u6d77\u5e02\u95f5\u884c\u533a\u8679\u6865\u5546\u52a1\u533a", "121.327000", "31.200000", "1.28"),
+        ("shanghai-pudong", "\u4e0a\u6d77\u6d66\u4e1c\u5145\u7535\u7ad9", "\u4e0a\u6d77\u5e02\u6d66\u4e1c\u65b0\u533a\u4e16\u7eaa\u5927\u9053", "121.544000", "31.221000", "1.32"),
+        ("beijing-guomao", "\u5317\u4eac\u56fd\u8d38\u5145\u7535\u7ad9", "\u5317\u4eac\u5e02\u671d\u9633\u533a\u56fd\u8d38\u5546\u5708", "116.458000", "39.908000", "1.32"),
+        ("beijing-haidian", "\u5317\u4eac\u6d77\u6dc0\u5145\u7535\u7ad9", "\u5317\u4eac\u5e02\u6d77\u6dc0\u533a\u4e2d\u5173\u6751", "116.316000", "39.983000", "1.24"),
+        ("guangzhou-tianhe", "\u5e7f\u5dde\u5929\u6cb3\u5145\u7535\u7ad9", "\u5e7f\u5dde\u5e02\u5929\u6cb3\u533a\u73e0\u6c5f\u65b0\u57ce", "113.324000", "23.119000", "1.32"),
+        ("guangzhou-panyu", "\u5e7f\u5dde\u756a\u79ba\u5145\u7535\u7ad9", "\u5e7f\u5dde\u5e02\u756a\u79ba\u533a\u6c49\u6eaa\u5927\u9053", "113.330000", "22.992000", "1.24"),
+        ("hangzhou-binjiang", "\u676d\u5dde\u6ee8\u6c5f\u5145\u7535\u7ad9", "\u676d\u5dde\u5e02\u6ee8\u6c5f\u533a\u6c5f\u5357\u5927\u9053", "120.205000", "30.208000", "1.28"),
+        ("hangzhou-yuhang", "\u676d\u5dde\u4f59\u676d\u5145\u7535\u7ad9", "\u676d\u5dde\u5e02\u4f59\u676d\u533a\u672a\u6765\u79d1\u6280\u57ce", "120.005000", "30.280000", "1.20"),
+    ]:
+        stations.append((uuid5(NAMESPACE_URL, "electra:demo-region:" + key),
+                         name, address, Decimal(lon), Decimal(lat), Decimal(price)))
+
     chargers = [
         (
             UUID("20000000-0000-0000-0000-000000000001"),

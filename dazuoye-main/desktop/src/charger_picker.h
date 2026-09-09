@@ -4,7 +4,8 @@
 class ChargerPicker : public QWidget {
   public:
     explicit ChargerPicker(QWidget *parent = nullptr);
-    void setChargers(const QJsonArray &items, bool readOnly, bool fastOnly);
+    void setChargers(const QJsonArray &items, bool readOnly, bool fastOnly,
+                     const QString &statusFilter = {}, const QString &kindFilter = {});
     QString selectedId() const { return selected; }
     std::function<void()> selectionChanged;
   protected:

@@ -3,9 +3,19 @@
 #include <QJsonArray>
 #include <QtWidgets>
 
+namespace DialogAppearance {
+inline constexpr qreal WidthRatio = 0.80;
+inline constexpr qreal HeightRatio = 0.60;
+inline constexpr int BorderWidth = 2;
+inline constexpr int CornerRadius = 18;
+inline constexpr char BackgroundColor[] = "#2a2033";
+inline constexpr char BorderColor[] = "#594566";
+}
+
 QString text(const QJsonObject &o, const QString &key, const QString &fallback = "—");
 double number(const QJsonObject &o, const QString &key);
 QString money(double value);
+QString localDateTime(const QString &value);
 QString statusText(const QString &value);
 QString uid();
 QIcon appIcon(const QString &name, const QColor &color = QColor("#d7c5e8"));

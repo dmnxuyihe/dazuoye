@@ -1,6 +1,27 @@
 #include "avatar_editor.h"
 #include <QImageReader>
 
+QImage circularAvatarImage(const QImage &image, int size) {
+    if (image.isNull() || size <= 0) return {};
+
+    QImage avatar(size, size, QImage::Format_ARGB32_Premultiplied);
+    avatar.fill(Qt::transparent);
+    const double scale = qMax(double(size) / image.width(), double(size) / image.height());
+    const QSizeF scaled(image.width() * scale, image.height() * scale);
+
+    QPainter painter(&avatar);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    QPainterPath clip;
+    clip.addEllipse(QRectF(0, 0, size, size));
+    painter.setClipPath(clip);
+    painter.drawImage(QRectF(QPointF(size / 2.0, size / 2.0) -
+                                   QPointF(scaled.width() / 2.0, scaled.height() / 2.0),
+                               scaled),
+                      image);
+    return avatar;
+}
+
 AvatarCanvas::AvatarCanvas(QWidget *parent):QWidget(parent) {
     setObjectName("avatar-canvas");setMinimumHeight(240);setCursor(Qt::OpenHandCursor);
 }
@@ -12,15 +33,16 @@ void AvatarCanvas::setZoom(int percent){zoom=percent/100.;update();}
 void AvatarCanvas::setBrightness(int value){brightness=value;update();}
 QImage AvatarCanvas::result() const {
     if(working.isNull())return {};
-    QImage out(256,256,QImage::Format_RGB32);out.fill(QColor("#21152f"));
+    QImage out(256,256,QImage::Format_ARGB32_Premultiplied);out.fill(Qt::transparent);
     const double scale=qMax(256./working.width(),256./working.height())*zoom;
     QSizeF size(working.width()*scale,working.height()*scale);
     // Clamp panning to keep every output pixel covered by the source image.
     QPointF pan(qBound(-(size.width()-256)/2,offset.x()*256,(size.width()-256)/2),
                 qBound(-(size.height()-256)/2,offset.y()*256,(size.height()-256)/2));
-    QPainter p(&out);p.setRenderHint(QPainter::SmoothPixmapTransform);
+    QPainter p(&out);p.setRenderHint(QPainter::Antialiasing);p.setRenderHint(QPainter::SmoothPixmapTransform);
+    QPainterPath clip;clip.addEllipse(QRectF(0,0,256,256));p.setClipPath(clip);
     p.drawImage(QRectF(QPointF(128,128)-QPointF(size.width()/2,size.height()/2)+pan,size),working);p.end();
-    if(brightness)for(int y=0;y<out.height();++y){auto line=reinterpret_cast<QRgb *>(out.scanLine(y));for(int x=0;x<out.width();++x){auto c=line[x];line[x]=qRgb(qBound(0,qRed(c)+brightness,255),qBound(0,qGreen(c)+brightness,255),qBound(0,qBlue(c)+brightness,255));}}
+    if(brightness)for(int y=0;y<out.height();++y){auto line=reinterpret_cast<QRgb *>(out.scanLine(y));for(int x=0;x<out.width();++x){auto c=line[x];line[x]=qRgba(qBound(0,qRed(c)+brightness,255),qBound(0,qGreen(c)+brightness,255),qBound(0,qBlue(c)+brightness,255),qAlpha(c));}}
     return out;
 }
 void AvatarCanvas::paintEvent(QPaintEvent *) {
@@ -30,9 +52,9 @@ void AvatarCanvas::paintEvent(QPaintEvent *) {
 }
 void AvatarCanvas::mousePressEvent(QMouseEvent *e){last=e->position();}
 void AvatarCanvas::mouseMoveEvent(QMouseEvent *e){if(e->buttons()&Qt::LeftButton){offset+=(e->position()-last)/qMax(1,qMin(width(),height())-8);last=e->position();update();}}
-void showAvatarEditor(QWidget *owner, ApiClient *api, std::function<void(const QJsonObject &)> saved, const QImage &current) {
-    auto d=new QDialog(owner);d->setAttribute(Qt::WA_DeleteOnClose);d->resize(440,760);d->setWindowTitle("编辑头像");
-    auto l=new QVBoxLayout(d);l->addWidget(dialogHeader(d,label("编辑头像","font-size:22px;")));
+static void populateAvatarEditor(QWidget *d, QVBoxLayout *l, ApiClient *api,
+                                 std::function<void(const QJsonObject &)> saved,
+                                 std::function<void()> finished, const QImage &current) {
     l->addWidget(label("拖动调整位置，圆形虚线为头像显示范围。","color:#bca8ca;font-size:11px;"));
     auto canvas=new AvatarCanvas;l->addWidget(canvas);
     auto zoom=new QSlider(Qt::Horizontal);zoom->setObjectName("avatar-zoom");zoom->setRange(100,300);zoom->setValue(100);
@@ -65,8 +87,21 @@ void showAvatarEditor(QWidget *owner, ApiClient *api, std::function<void(const Q
     QObject::connect(save,&QPushButton::clicked,d,[=]{
         QByteArray bytes;QBuffer buffer(&bytes);buffer.open(QIODevice::WriteOnly);canvas->result().save(&buffer,"PNG");save->setEnabled(false);
         api->request("PUT","/me/avatar",{{"png_base64",QString::fromLatin1(bytes.toBase64())}},d,[=](const Reply &r){
-            save->setEnabled(true);if(!r.ok){error->setText(r.error);return;}saved(r.data.object());d->accept();
+            save->setEnabled(true);if(!r.ok){error->setText(r.error);return;}saved(r.data.object());finished();
         });
     });
+}
+void showAvatarEditor(QWidget *owner, ApiClient *api, std::function<void(const QJsonObject &)> saved, const QImage &current) {
+    auto d=new QDialog(owner);d->setAttribute(Qt::WA_DeleteOnClose);d->resize(440,760);d->setWindowTitle("编辑头像");
+    auto l=new QVBoxLayout(d);l->addWidget(dialogHeader(d,label("编辑头像","font-size:22px;")));
+    populateAvatarEditor(d,l,api,std::move(saved),[d]{d->accept();},current);
     d->show();
+}
+QWidget *createAvatarEditorPage(QWidget *owner, ApiClient *api,
+                                std::function<void(const QJsonObject &)> saved,
+                                const QImage &current) {
+    auto page=new QWidget(owner);page->setObjectName("avatar-editor-page");
+    auto layout=new QVBoxLayout(page);layout->setContentsMargins(0,0,0,0);
+    populateAvatarEditor(page,layout,api,std::move(saved),[]{},current);
+    return page;
 }

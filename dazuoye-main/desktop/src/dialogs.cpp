@@ -34,71 +34,111 @@ void compactFilePicker(QFileDialog *dialog) {
     }
 }
 
-void prepareContent(QDialog *dialog, int width) {
+void prepareContent(QDialog *dialog) {
     if (dialog->property("dialogPrepared").toBool()) return;
     dialog->setProperty("dialogPrepared", true);
     if (auto file = qobject_cast<QFileDialog *>(dialog)) {
-        if (width < 600) compactFilePicker(file);
+        compactFilePicker(file);
         return;
     }
-    auto header = dialog->findChild<QWidget *>("dialog-header");
-    auto original = dialog->layout();
-    if (!header || !original) return; // Let standard message/input dialogs lay out their own text.
     for (auto form : dialog->findChildren<QFormLayout *>())
-        if (width < 600) form->setRowWrapPolicy(QFormLayout::WrapAllRows);
+        form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     for (auto label : dialog->findChildren<QLabel *>()) {
-        const int naturalWidth = label->sizeHint().width();
         label->setWordWrap(true);
-        if (width < 600) {
-            label->setMaximumWidth(qMax(120, width - 40));
-            if (!label->parentWidget() || label->parentWidget()->objectName() != "dialog-header")
-                label->setMinimumWidth(qMin(naturalWidth, qMax(120, width - 72)));
-        }
+        label->setMaximumWidth(qMax(260, dialogBounds(dialog).width() - 64));
     }
-    original->removeWidget(header);
-    QWidget *footer = nullptr;
-    if (original->count()) {
-        auto last = original->itemAt(original->count() - 1)->widget();
-        if (qobject_cast<QPushButton *>(last) || qobject_cast<QDialogButtonBox *>(last)) {
-            footer = last;
-            original->removeWidget(footer);
-        }
+}
+
+void centerDialogContent(QDialog *dialog) {
+    if (auto layout = dialog->layout()) {
+        layout->setContentsMargins(24, 22, 24, 22);
+        layout->setSpacing(qMax(12, layout->spacing()));
     }
-    auto content = new QWidget;
-    content->setLayout(original); // Transfer ownership of the existing form without changing callbacks.
-    auto layout = new QVBoxLayout(dialog);
-    layout->setContentsMargins(12, 12, 12, 12);
-    layout->addWidget(header);
-    auto scroll = new QScrollArea;
-    scroll->setObjectName("dialog-body-scroll");
-    scroll->setWidgetResizable(true);
-    scroll->setWidget(content);
-    layout->addWidget(scroll, 1);
-    if (footer) layout->addWidget(footer);
+
+    const bool filePicker = qobject_cast<QFileDialog *>(dialog);
+    for (auto label : dialog->findChildren<QLabel *>()) {
+        // Keep the file browser itself conventional, while centering its explanatory text.
+        if (filePicker && label->inherits("QFileDialogLabel"))
+            continue;
+        label->setAlignment(Qt::AlignCenter);
+        label->setWordWrap(true);
+    }
+    for (auto lineEdit : dialog->findChildren<QLineEdit *>())
+        lineEdit->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    for (auto spinBox : dialog->findChildren<QAbstractSpinBox *>())
+        if (auto editor = spinBox->findChild<QLineEdit *>())
+            editor->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    for (auto form : dialog->findChildren<QFormLayout *>()) {
+        form->setLabelAlignment(Qt::AlignCenter);
+        form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
+        form->setHorizontalSpacing(16);
+        form->setVerticalSpacing(qMax(12, form->verticalSpacing()));
+    }
+    for (auto box : dialog->findChildren<QDialogButtonBox *>())
+        box->setCenterButtons(true);
+    for (auto table : dialog->findChildren<QTableWidget *>())
+        for (int row = 0; row < table->rowCount(); ++row)
+            for (int column = 0; column < table->columnCount(); ++column)
+                if (auto item = table->item(row, column)) item->setTextAlignment(Qt::AlignCenter);
+}
+
+void centerDialogFrame(QDialog *dialog) {
+    const auto bounds = dialogBounds(dialog);
+    if (bounds.isEmpty()) return;
+    dialog->move(dialog->pos() + bounds.center() - dialog->frameGeometry().center());
+    const QRect frame = dialog->frameGeometry();
+    QPoint correction;
+    if (frame.left() < bounds.left()) correction.rx() += bounds.left() - frame.left();
+    if (frame.right() > bounds.right()) correction.rx() -= frame.right() - bounds.right();
+    if (frame.top() < bounds.top()) correction.ry() += bounds.top() - frame.top();
+    if (frame.bottom() > bounds.bottom()) correction.ry() -= frame.bottom() - bounds.bottom();
+    if (!correction.isNull()) dialog->move(dialog->pos() + correction);
 }
 
 void fitDialog(QDialog *dialog) {
     const auto bounds = dialogBounds(dialog);
     if (bounds.isEmpty()) return;
-    prepareContent(dialog, bounds.width());
-    if (dialog->layout()) dialog->layout()->setSizeConstraint(QLayout::SetNoConstraint);
+    prepareContent(dialog);
+    centerDialogContent(dialog);
     dialog->setMinimumSize(0, 0);
-    const QSize decorations = dialog->frameGeometry().size() - dialog->size();
-    const auto maximum = bounds.size() - decorations;
-    dialog->setMaximumSize(maximum);
-    dialog->resize(dialog->size().boundedTo(maximum));
-    if (dialog->layout()) dialog->layout()->activate();
-    dialog->move(dialog->pos() + bounds.center() - dialog->frameGeometry().center());
+    dialog->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    if (dialog->layout()) {
+        dialog->layout()->setSizeConstraint(QLayout::SetMinAndMaxSize);
+        dialog->layout()->activate();
+    }
+    QSize target = dialog->sizeHint().expandedTo(QSize(320, 180));
+    if (qobject_cast<QFileDialog *>(dialog)) target = target.expandedTo(QSize(560, 380));
+    target = target.boundedTo(bounds.size());
+    dialog->resize(target);
+    centerDialogFrame(dialog);
 }
 
 class DialogPolicy : public QObject {
   public:
     using QObject::QObject;
     bool eventFilter(QObject *object, QEvent *event) override {
+        if (event->type() == QEvent::Resize) {
+            if (auto dialog = qobject_cast<QDialog *>(object); dialog && dialog->isVisible() &&
+                !dialog->property("dialogCenterQueued").toBool()) {
+                dialog->setProperty("dialogCenterQueued", true);
+                QTimer::singleShot(0, dialog, [dialog] {
+                    dialog->setProperty("dialogCenterQueued", false);
+                    centerDialogFrame(dialog);
+                });
+            }
+        }
         if (event->type() == QEvent::Show) {
             if (auto dialog = qobject_cast<QDialog *>(object)) {
+                dialog->setStyleSheet(dialog->styleSheet() + QString(
+                    "QDialog{background:%1;border:%2px solid %3;border-radius:%4px;}")
+                    .arg(DialogAppearance::BackgroundColor)
+                    .arg(DialogAppearance::BorderWidth)
+                    .arg(DialogAppearance::BorderColor)
+                    .arg(DialogAppearance::CornerRadius));
                 // Run after the platform's default placement, including modal exec() dialogs.
                 QTimer::singleShot(0, dialog, [dialog] { fitDialog(dialog); });
+                // Some platform dialogs update their frame after the first layout pass.
+                QTimer::singleShot(50, dialog, [dialog] { fitDialog(dialog); });
             }
         }
         return false;

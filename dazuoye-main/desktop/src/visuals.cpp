@@ -1,5 +1,32 @@
 #include "visuals.h"
 #include <cmath>
+namespace {
+double roundedAxisMaximum(double value) {
+    if (value <= 0)
+        return 1;
+    const double magnitude = std::pow(10., std::floor(std::log10(value)));
+    return std::ceil(value / magnitude) * magnitude;
+}
+
+double roundedTickStep(double maximum) {
+    const double target = maximum / 5.;
+    const double magnitude = std::pow(10., std::floor(std::log10(target)));
+    return std::ceil(target / magnitude) * magnitude;
+}
+
+QString axisNumber(double value, double step) {
+    int decimals = 0;
+    if (step < 1)
+        decimals = qMin(3, qMax(0, int(std::ceil(-std::log10(step)))));
+    QString result = QString::number(value, 'f', decimals);
+    while (result.contains('.') && result.endsWith('0'))
+        result.chop(1);
+    if (result.endsWith('.'))
+        result.chop(1);
+    return result;
+}
+} // namespace
+
 Segments::Segments(const QStringList &labels, int selected, QWidget *parent) : QWidget(parent) {
     setObjectName("segments");
     setAttribute(Qt::WA_StyledBackground);
@@ -171,15 +198,21 @@ void DataGraphic::paintEvent(QPaintEvent *) {
         p.drawText(rect(), Qt::AlignCenter, "暂无对应时段记录");
         return;
     }
-    maximum = qMax(1., maximum) * 1.12;
+    maximum = roundedAxisMaximum(maximum);
     QRectF area(60, 16, w - 73, h - 46);
-    for (int i = 0; i < 4; i++) {
-        double y = area.top() + i * area.height() / 3;
+    const double tickStep = roundedTickStep(maximum);
+    QList<double> ticks;
+    for (double value = 0; value < maximum; value += tickStep)
+        ticks.prepend(value);
+    if (ticks.isEmpty() || !qFuzzyCompare(ticks.first() + 1., maximum + 1.))
+        ticks.prepend(maximum);
+    for (double value : ticks) {
+        double y = area.bottom() - value / maximum * area.height();
         p.setPen(QPen(QColor("#493151"), 1, Qt::DashLine));
         p.drawLine(QPointF(area.left(), y), QPointF(area.right(), y));
         p.setPen(QColor("#a88dbb"));
         p.drawText(QRectF(0, y - 8, 54, 16), Qt::AlignRight | Qt::AlignVCenter,
-                   QString::number(maximum * (3 - i) / 3., 'g', 3));
+                   axisNumber(value, tickStep));
     }
     if (type == GroupedBars) {
         double step = area.width() / n, bw = qMin(6., step / (series.size() + 2));
@@ -248,7 +281,10 @@ void DataGraphic::mouseMoveEvent(QMouseEvent *e) {
         return;
     int i = qBound(0, int((e->position().x() - 60) / qMax(1., width() - 73.) * n), n - 1);
     QStringList values;
-    for (auto s : series)
-        values << money(s.value(i));
-    setToolTip(labels.value(i) + "\n" + values.join(" / ") + " " + unit);
+    for (auto s : series) {
+        const QString value = money(s.value(i));
+        values << (unit == "元" ? "消费：¥" + value : value + " " + unit);
+    }
+    QToolTip::showText(e->globalPosition().toPoint() + QPoint(12, 16),
+                       labels.value(i) + "\n" + values.join(" / "), this);
 }

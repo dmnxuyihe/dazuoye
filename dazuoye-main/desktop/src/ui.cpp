@@ -24,6 +24,17 @@ double number(const QJsonObject &o, const QString &key) {
 QString money(double v) {
     return QLocale(QLocale::Chinese).toString(v, 'f', 2);
 }
+QString localDateTime(const QString &value) {
+    if (value.isEmpty()) return value;
+    QString normalized = value;
+    // Qt milliseconds parsing is intentionally strict; the API may return
+    // Python-style microseconds, so trim extra fractional digits first.
+    normalized.replace(QRegularExpression("(\\.\\d{3})\\d+(?=(Z|[+-]\\d{2}:\\d{2})$)"), "\\1");
+    auto dateTime = QDateTime::fromString(normalized, Qt::ISODateWithMs);
+    if (!dateTime.isValid()) dateTime = QDateTime::fromString(normalized, Qt::ISODate);
+    if (!dateTime.isValid()) return value;
+    return dateTime.toLocalTime().toString("yyyy-MM-dd HH:mm:ss");
+}
 QString uid() {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
@@ -277,7 +288,8 @@ void applyTheme(QApplication &app) {
     installDialogPolicy(app);
     app.setFont(QFont(QFontDatabase::applicationFontFamilies(fontId).value(0, "Noto Sans SC"), 10));
     app.setStyleSheet(R"(
-QMainWindow,QDialog { background:#100a1a; color:#f6edff; }
+QMainWindow { background:#100a1a; color:#f6edff; }
+QDialog { color:#f6edff; }
 QWidget { color:#eee4f8; font-size:13px; }
 QWidget#canvas {background:qradialgradient(cx:.4,cy:0,radius:1,fx:.4,fy:0,stop:0 #583456,stop:.65 #100a1a);}
 QWidget#root {background:#100b1b;border:3px solid #4b3d57;border-radius:28px;}
@@ -312,16 +324,21 @@ QWidget *dialogHeader(QDialog *dialog, QLabel *title) {
     header->setObjectName("dialog-header");
     auto layout = new QHBoxLayout(header);
     layout->setContentsMargins(0, 0, 0, 4);
+    auto balance = new QWidget(header);
+    balance->setFixedWidth(40);
+    layout->addWidget(balance);
     title->setWordWrap(true);
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet(title->styleSheet() + "font-weight:700;");
     layout->addWidget(title, 1);
-    auto close = new QPushButton("× 关闭", header);
+    auto close = new QPushButton("×", header);
     close->setObjectName("dialog-close");
     close->setAccessibleName("关闭弹窗");
     close->setToolTip("关闭弹窗（Esc）");
     close->setCursor(Qt::PointingHandCursor);
     close->setAutoDefault(false);
     close->setDefault(false);
-    close->setMinimumSize(84, 40);
+    close->setFixedSize(40, 40);
     layout->addWidget(close, 0, Qt::AlignTop);
     QObject::connect(close, &QPushButton::clicked, dialog, &QDialog::reject);
     return header;
@@ -332,8 +349,6 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
     d->setWindowTitle(title);
     auto l = new QVBoxLayout(d);
     l->addWidget(dialogHeader(d, label(title, "font-size:22px;")));
-    auto scroll = new QScrollArea;
-    scroll->setWidgetResizable(true);
     auto content = new QWidget;
     auto form = new QFormLayout(content);
     form->setContentsMargins(14, 14, 14, 14);
@@ -373,7 +388,12 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
             table->setHorizontalHeaderLabels(headings);
             for (int i = 0; i < rows.size(); ++i)
                 for (int j = 0; j < keys.size(); ++j)
-                    table->setItem(i, j, new QTableWidgetItem(statusText(text(rows[i].toObject(), keys[j]))));
+                    {
+                        const auto raw = text(rows[i].toObject(), keys[j]);
+                        const auto dateTime = localDateTime(raw);
+                        table->setItem(i, j, new QTableWidgetItem(
+                            dateTime != raw ? dateTime : statusText(raw)));
+                    }
             table->setEditTriggers(QAbstractItemView::NoEditTriggers);
             table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
             const bool compactPricingTable = it.key() == "billing_detail" || it.key() == "tariff_snapshot";
@@ -393,16 +413,18 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
                 it.value().isObject()
                     ? QJsonDocument(it.value().toObject()).toJson(QJsonDocument::Indented)
                     : QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
-        else
-            value = statusText(it.value().toVariant().toString());
+        else {
+            const auto raw = it.value().toVariant().toString();
+            const auto dateTime = localDateTime(raw);
+            value = dateTime != raw ? dateTime : statusText(raw);
+        }
         auto field =
             label(fields.value(it.key()).toString(it.key()), "font-size:12px;color:#a58ab8;");
         auto content = label(value, "font-size:13px;");
         content->setTextInteractionFlags(Qt::TextSelectableByMouse);
         form->addRow(field, content);
     }
-    scroll->setWidget(content);
-    l->addWidget(scroll);
+    l->addWidget(content);
     l->addWidget(button("关闭", d, [d] { d->accept(); }, true));
     d->resize(620, 560);
     d->show();

@@ -53,7 +53,10 @@ StationMap::StationMap(QWidget *parent) : QWidget(parent) {
     auto channel = new QWebChannel(view);
     bridge = new StationMapBridge(channel);
     connect(bridge, &StationMapBridge::picked, this, &StationMap::selectStation);
-    connect(bridge, &StationMapBridge::located, this, &StationMap::setLocation);
+    connect(bridge, &StationMapBridge::located, this, [this](double latitude, double longitude) {
+        ++routeGeneration; // Only an explicit user location change invalidates a pending route.
+        setLocation(latitude, longitude);
+    });
     connect(bridge, &StationMapBridge::addressRequested, this, [this](const QString &address) {
         if (!api || address.trimmed().size()<2) { message("请输入城市和详细地址"); return; }
         message("正在解析地址…");
@@ -83,7 +86,22 @@ StationMap::StationMap(QWidget *parent) : QWidget(parent) {
     layout->addWidget(view);
     connect(view, &QWebEngineView::loadFinished, this, [this](bool ok) {
         ready = ok;
-        if (ok) { setCompact(compact); sync(); if(hasLocation) view->page()->runJavaScript(QString("updateLocation(%1,%2,false)").arg(myLatitude,0,'f',6).arg(myLongitude,0,'f',6)); }
+        if (ok) {
+            setCompact(compact);
+            sync();
+            if (hasLocation)
+                view->page()->runJavaScript(QString("updateLocation(%1,%2,false,false)")
+                    .arg(myLatitude,0,'f',6).arg(myLongitude,0,'f',6));
+            if (focusLocationWhenReady) {
+                focusLocationWhenReady = false;
+                view->page()->runJavaScript(focusOnlyIfUntouchedWhenReady
+                    ? "window.focusLocation(true)" : "window.focusLocation(false)");
+            }
+            if (locateWhenReady) {
+                locateWhenReady = false;
+                view->page()->runJavaScript("window.locateMe(true)");
+            }
+        }
     });
     auto read = [](const QString &path) {
         QFile file(path); file.open(QIODevice::ReadOnly); return QString::fromUtf8(file.readAll());
@@ -99,6 +117,10 @@ StationMap::StationMap(QWidget *parent) : QWidget(parent) {
 void StationMap::setCompact(bool enabled) {
     compact = enabled;
     if (ready) view->page()->runJavaScript(QString("document.body.classList.toggle('compact',%1)").arg(enabled ? "true" : "false"));
+}
+void StationMap::requestCurrentLocation() {
+    if (ready) view->page()->runJavaScript("window.locateMe(true)");
+    else locateWhenReady = true;
 }
 void StationMap::setStations(const QJsonArray &rows, const QString &id) {
     stations = {};
@@ -122,12 +144,44 @@ void StationMap::sync() {
     view->page()->runJavaScript("window.setStations(" + QString::fromUtf8(payload) + ")");
 }
 void StationMap::selectStation(const QString &id) {
+    focusLocationWhenReady = false;
     for (const auto &v : stations)
         if (v.toObject()["id"].toString() == id) {
+            if (selected == id) {
+                if (ready)
+                    view->page()->runJavaScript("window.selectStation(" +
+                        QString::fromUtf8(QJsonDocument(QJsonArray{id}).toJson(QJsonDocument::Compact)) + "[0],true)");
+                return;
+            }
             selected = id;
+            if (ready)
+                view->page()->runJavaScript("window.selectStation(" +
+                    QString::fromUtf8(QJsonDocument(QJsonArray{id}).toJson(QJsonDocument::Compact)) + "[0],true)");
             emit stationSelected(id);
             return;
         }
+}
+void StationMap::focusLocation(bool onlyIfUntouched) {
+    if (!hasLocation) return;
+    if (ready) view->page()->runJavaScript(
+        onlyIfUntouched ? "window.focusLocation(true)" : "window.focusLocation(false)");
+    else {
+        focusLocationWhenReady = true;
+        focusOnlyIfUntouchedWhenReady = onlyIfUntouched;
+    }
+}
+void StationMap::navigateToStation(const QString &id) {
+    for (const auto &value : stations) {
+        if (value.toObject()["id"].toString() != id) continue;
+        selected = id;
+        focusLocationWhenReady = false;
+        if (ready)
+            view->page()->runJavaScript("window.selectStation(" +
+                QString::fromUtf8(QJsonDocument(QJsonArray{id}).toJson(QJsonDocument::Compact)) +
+                "[0],false)");
+        break;
+    }
+    emit bridge->navigationRequested(id);
 }
 void StationMap::fitStations(bool allCities) {
     if (ready) view->page()->runJavaScript(allCities ? "window.fitStations(true)" : "window.fitStations(false)");
@@ -144,13 +198,15 @@ void StationMap::message(const QString &text) {
 }
 void StationMap::setLocation(double lat, double lon) {
     if(!std::isfinite(lat)||!std::isfinite(lon)||qAbs(lat)>85||qAbs(lon)>180)return;
-    myLatitude=lat; myLongitude=lon; hasLocation=true; ++routeGeneration;
+    myLatitude=lat; myLongitude=lon; hasLocation=true;
     if(api) {
         QSettings settings;
         settings.setValue("map/"+api->baseUrl().toString()+"/lat",lat);
         settings.setValue("map/"+api->baseUrl().toString()+"/lon",lon);
     }
-    if(ready)view->page()->runJavaScript(QString("updateLocation(%1,%2,false)").arg(lat,0,'f',6).arg(lon,0,'f',6));
+    // Cached and remotely synchronized positions update the marker without stealing
+    // focus from a selected station or an active navigation route.
+    if(ready)view->page()->runJavaScript(QString("updateLocation(%1,%2,false,false)").arg(lat,0,'f',6).arg(lon,0,'f',6));
     emit locationChanged(lat,lon);
 }
 void StationMap::setApi(ApiClient *client) {
@@ -165,7 +221,12 @@ void StationMap::setApi(ApiClient *client) {
         if(!isVisible())return;
         api->request("GET","/public/map/preview-location",{},this,[this](const Reply &r) {
             const auto o=r.data.object();const auto stamp=o["updated_at"].toDouble();
-            if(r.ok&&stamp>previewStamp) {previewStamp=stamp;setLocation(o["latitude"].toDouble(),o["longitude"].toDouble());}
+            if(r.ok&&stamp>previewStamp) {
+                const bool initialPreview = previewStamp == 0;
+                previewStamp=stamp;
+                setLocation(o["latitude"].toDouble(),o["longitude"].toDouble());
+                focusLocation(initialPreview);
+            }
         },false);
     });
     poll->start(3000);
