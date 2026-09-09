@@ -116,7 +116,13 @@ FaceImageProcessor::Result FaceImageProcessor::process(const QImage &image) {
 
         result.detectionPreview = image.copy();
         QPainter marker(&result.detectionPreview);
-        marker.setPen(QPen(QColor("#7ee7c1"), qMax(2, image.width() / 250)));
+        const int lineWidth = qMax(2, image.width() / 250) * 3;
+        marker.setPen(QPen(QColor("#ffd54f"), lineWidth));
+        for (const auto &detected : faces)
+            marker.drawRect(QRect(detected.x, detected.y, detected.width, detected.height));
+        // Draw the selected largest face last so its green border remains clear
+        // even if detected rectangles overlap.
+        marker.setPen(QPen(QColor("#55e6a5"), lineWidth + 2));
         marker.drawRect(result.mainFace);
         marker.end();
 

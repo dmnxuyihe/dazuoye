@@ -70,12 +70,13 @@ static void populateAvatarEditor(QWidget *host,QVBoxLayout *layout,ApiClient *ap
     QObject::connect(original,&QPushButton::clicked,host,[=]{showVersion(FaceVersion::Original);});QObject::connect(beauty,&QPushButton::clicked,host,[=]{showVersion(FaceVersion::Beautified);});
     auto applyImage=[=](const QImage &image){
         if(image.isNull())return;state->source=image;
-        if(state->mode==AvatarMode::Normal){state->cropped={};state->beautified={};detection->hide();versions->hide();canvas->setImage(image);reset();return;}
+        if(state->mode==AvatarMode::Normal){state->cropped={};state->beautified={};detection->setToolTip({});canvas->setToolTip({});detection->hide();versions->hide();canvas->setImage(image);reset();return;}
         const auto result=FaceImageProcessor::process(image);
         if(!result.ok){QMessageBox box(QMessageBox::Warning,"人脸检测",result.error,QMessageBox::Retry,host);auto useNormal=box.addButton("使用普通头像模式",QMessageBox::AcceptRole);box.exec();if(box.clickedButton()==useNormal)normal->click();return;}
         state->cropped=result.croppedImage;state->beautified=result.beautifiedImage;
         detection->setPixmap(QPixmap::fromImage(result.detectionPreview).scaled(detection->size(),Qt::KeepAspectRatio,Qt::SmoothTransformation));
-        detection->setToolTip(QString("检测到 %1 张人脸，绿色框是面积最大的人脸；此标记不会上传。").arg(result.faceCount));detection->show();versions->show();showVersion(FaceVersion::Original);
+        const QString faceTip=QString("识别到 %1 张人脸\n绿色框：面积最大的主脸\n黄色框：其他人脸\n检测框仅用于预览，不会上传").arg(result.faceCount);
+        detection->setToolTip(faceTip);canvas->setToolTip(faceTip);detection->show();versions->show();showVersion(FaceVersion::Original);
     };
     QObject::connect(normal,&QRadioButton::toggled,host,[=](bool on){if(!on)return;state->mode=AvatarMode::Normal;hint->setText("普通模式允许上传任意图片，不会进行人脸检测。");if(!state->source.isNull())applyImage(state->source);});
     QObject::connect(face,&QRadioButton::toggled,host,[=](bool on){if(!on)return;state->mode=AvatarMode::Face;hint->setText("人脸模式将检测最大人脸、自动裁剪，并提供原图与轻度美颜预览。");if(!FaceImageProcessor::isAvailable()){QMessageBox::warning(host,"人脸头像","人脸检测组件加载失败，可继续使用普通头像模式。");normal->setChecked(true);return;}if(!state->source.isNull())applyImage(state->source);});
