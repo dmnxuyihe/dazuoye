@@ -48,6 +48,7 @@ class StationMap : public QWidget {
     QJsonArray stations;
     QString selected;
     bool ready = false, compact = false;
+    bool focusLocationWhenReady = false;
     double myLatitude = 0, myLongitude = 0;
     bool hasLocation = false;
 };

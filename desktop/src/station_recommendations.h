@@ -20,10 +20,8 @@ class StationRecommendations : public QWidget {
     QString selected;
     QJsonArray rows;
     QVBoxLayout *cards;
-    QVBoxLayout *detailLayout;
     QLabel *hint;
     QPushButton *summary;
-    QFrame *detail;
     QScrollArea *scroll;
     bool expanded = false;
 };

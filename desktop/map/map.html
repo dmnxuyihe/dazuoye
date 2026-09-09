@@ -15,11 +15,11 @@ setTimeout(()=>{if(!window.loadedTiles){status.hidden=false;status.textContent='
 L.control.scale({imperial:false}).addTo(map);
 new QWebChannel(qt.webChannelTransport,c=>{bridge=c.objects.stationBridge});
 let locationMarker=null, picking=false;
-function updateLocation(lat,lon,notify=true){
- clearRoute();
+function updateLocation(lat,lon,notify=true,focus=true){
+ if(notify)clearRoute();
  if(locationMarker) locationMarker.remove();
  locationMarker=L.circleMarker([lat,lon],{radius:8,color:'#fff',fillColor:'#3478f6',fillOpacity:1}).addTo(map).bindTooltip('我的位置');
- map.setView([lat,lon],13); if(bridge && notify)bridge.locate(lat,lon);
+ if(focus)map.setView([lat,lon],13); if(bridge && notify)bridge.locate(lat,lon);
  status.hidden=false;status.textContent='已更新我的位置，可选择站点导航';
 }
 window.focusLocation=function(){if(locationMarker)map.flyTo(locationMarker.getLatLng(),15,{duration:.45})};

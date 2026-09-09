@@ -183,6 +183,14 @@ void UserWindow::refresh() {
         });
 }
 void UserWindow::navigate(const QString &page) {
+    if (page == "station" && text(active, "status") == "pending_payment") {
+        QMessageBox dialog(QMessageBox::Warning, "请先结算",
+                           "您有未完成的充电订单，请先结算", QMessageBox::NoButton, this);
+        dialog.addButton("去结算", QMessageBox::AcceptRole);
+        dialog.exec();
+        navigate("charging");
+        return;
+    }
     if (page == "schedule" && current != "schedule") scheduleOrigin = current;
     if (page == "charging" && current != "charging")
         chargingOrigin = current == "history" ? "history" : "home";
@@ -221,11 +229,12 @@ void UserWindow::navigate(const QString &page) {
         withdrawalsPage();
     else
         home();
-    body->addStretch();
+    if (page != "map") body->addStretch();
     if (pageScroll) {
-        pageScroll->setVerticalScrollBarPolicy(page == "charging" ? Qt::ScrollBarAlwaysOff
-                                                                   : Qt::ScrollBarAsNeeded);
-        pageScroll->verticalScrollBar()->setEnabled(page != "charging");
+        const bool fixedPage = page == "charging" || page == "map";
+        pageScroll->setVerticalScrollBarPolicy(fixedPage ? Qt::ScrollBarAlwaysOff
+                                                         : Qt::ScrollBarAsNeeded);
+        pageScroll->verticalScrollBar()->setEnabled(!fixedPage);
         if (samePage)
             QTimer::singleShot(0,pageScroll,[pageScroll,previousScroll]{
                 pageScroll->verticalScrollBar()->setValue(previousScroll);

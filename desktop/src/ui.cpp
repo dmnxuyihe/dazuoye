@@ -26,8 +26,12 @@ QString money(double v) {
 }
 QString localDateTime(const QString &value) {
     if (value.isEmpty()) return value;
-    auto dateTime = QDateTime::fromString(value, Qt::ISODateWithMs);
-    if (!dateTime.isValid()) dateTime = QDateTime::fromString(value, Qt::ISODate);
+    QString normalized = value;
+    // Qt milliseconds parsing is intentionally strict; the API may return
+    // Python-style microseconds, so trim extra fractional digits first.
+    normalized.replace(QRegularExpression("(\\.\\d{3})\\d+(?=(Z|[+-]\\d{2}:\\d{2})$)"), "\\1");
+    auto dateTime = QDateTime::fromString(normalized, Qt::ISODateWithMs);
+    if (!dateTime.isValid()) dateTime = QDateTime::fromString(normalized, Qt::ISODate);
     if (!dateTime.isValid()) return value;
     return dateTime.toLocalTime().toString("yyyy-MM-dd HH:mm:ss");
 }
@@ -376,10 +380,12 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
             table->setHorizontalHeaderLabels(headings);
             for (int i = 0; i < rows.size(); ++i)
                 for (int j = 0; j < keys.size(); ++j)
-                    table->setItem(i, j, new QTableWidgetItem(
-                        keys[j].endsWith("_at") || keys[j].endsWith("_until")
-                            ? localDateTime(text(rows[i].toObject(), keys[j]))
-                            : statusText(text(rows[i].toObject(), keys[j]))));
+                    {
+                        const auto raw = text(rows[i].toObject(), keys[j]);
+                        const auto dateTime = localDateTime(raw);
+                        table->setItem(i, j, new QTableWidgetItem(
+                            dateTime != raw ? dateTime : statusText(raw)));
+                    }
             table->setEditTriggers(QAbstractItemView::NoEditTriggers);
             table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
             table->setMinimumHeight(280);
@@ -392,10 +398,11 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
                 it.value().isObject()
                     ? QJsonDocument(it.value().toObject()).toJson(QJsonDocument::Indented)
                     : QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
-        else if (it.key().endsWith("_at") || it.key().endsWith("_until"))
-            value = localDateTime(it.value().toVariant().toString());
-        else
-            value = statusText(it.value().toVariant().toString());
+        else {
+            const auto raw = it.value().toVariant().toString();
+            const auto dateTime = localDateTime(raw);
+            value = dateTime != raw ? dateTime : statusText(raw);
+        }
         auto field =
             label(fields.value(it.key()).toString(it.key()), "font-size:12px;color:#a58ab8;");
         auto content = label(value, "font-size:13px;");

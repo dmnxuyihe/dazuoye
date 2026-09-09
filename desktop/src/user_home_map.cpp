@@ -1,6 +1,7 @@
 #include "user_window.h"
 #include "station_map.h"
 #include "station_recommendations.h"
+#include "draggable_bottom_sheet.h"
 #include "visuals.h"
 #include "charger_picker.h"
 #include "avatar_editor.h"
@@ -63,37 +64,53 @@ void UserWindow::home() {
         label("车辆电量按订单模拟更新 · 费用按实际订单结算", "font-size:9px;color:#8f759f;"));
 }
 void UserWindow::mapPage() {
-    body->addWidget(pageHeading("发现充电网络", this, [this] { navigate("home"); }));
+    auto host = new DraggableBottomSheet;
+    if (auto pageScroll = root->findChild<QScrollArea *>("page-scroll"))
+        host->setMinimumHeight(qMax(610, pageScroll->viewport()->height()));
+    body->addWidget(host, 1);
+    auto panel = host->contentLayout();
+    auto sheetTitle = new QHBoxLayout;
+    sheetTitle->addWidget(label("附近充电站", "font-size:18px;font-weight:600;"));
+    sheetTitle->addStretch();
+    sheetTitle->addWidget(label("上下拖动查看", "color:#90799f;font-size:10px;"));
+    panel->addLayout(sheetTitle);
     auto search = new QLineEdit;
     search->setPlaceholderText("搜索站点名称或地址");
-    body->addWidget(search);
+    panel->addWidget(search);
 
     auto locationState = label("选择“我的位置”或在地图上选点后，将按距离推荐电站", muted);
-    body->addWidget(locationState);
+    panel->addWidget(locationState);
     auto map = new StationMap;
     map->setApi(api);
-    map->setMinimumHeight(350);
     map->setStations(stations, selectedStation);
-    body->addWidget(map);
+    host->setBackground(map);
 
     auto recommendations = new StationRecommendations;
-    body->addWidget(recommendations);
+    panel->addWidget(recommendations);
+    panel->addStretch();
 
     auto visibleRows = std::make_shared<QJsonArray>();
+    auto initialLocationFocused = std::make_shared<bool>(false);
     auto showStation = [=](const QString &id) {
         selectedStation = id;
         recommendations->setSelected(id);
-        map->selectStation(id); // 高亮标记并平滑跳转到站点。
         for (const auto &value : *visibleRows) {
             const auto station = value.toObject();
             if (text(station, "id") != id) continue;
             break;
         }
     };
-    connect(map, &StationMap::stationSelected, recommendations, showStation);
-    connect(recommendations, &StationRecommendations::stationSelected, map, showStation);
+    connect(map, &StationMap::stationSelected, recommendations, [=](const QString &id) {
+        *initialLocationFocused = true;
+        showStation(id);
+    });
+    connect(recommendations, &StationRecommendations::stationSelected, map, [=](const QString &id) {
+        *initialLocationFocused = true;
+        showStation(id);
+        map->selectStation(id);
+    });
     connect(recommendations, &StationRecommendations::navigationRequested, map,
-            [=](const QString &id) { map->navigateToStation(id); });
+            [=](const QString &id) { *initialLocationFocused = true; map->navigateToStation(id); });
     connect(recommendations, &StationRecommendations::stationChosen, this,
             [this](const QString &id) { selectedStation = id; navigate("station"); });
 
@@ -124,9 +141,12 @@ void UserWindow::mapPage() {
     };
     auto generation = std::make_shared<int>(0);
     connect(map, &StationMap::locationChanged, map, [=](double lat, double lon) {
+        if (!*initialLocationFocused) {
+            *initialLocationFocused = true;
+            map->focusLocation();
+        }
         locationState->setText(QString("我的位置：%1, %2  ·  正在查找附近电站…")
             .arg(lat, 0, 'f', 5).arg(lon, 0, 'f', 5));
-        map->focusLocation(); // 定位完成后先明确展示用户位置。
         const int request = ++*generation;
         api->get(QString("/public/stations?latitude=%1&longitude=%2").arg(lat,0,'f',6).arg(lon,0,'f',6), map,
             [=](const Reply &reply) {
@@ -135,7 +155,6 @@ void UserWindow::mapPage() {
                 stations = reply.data.array();
                 locationState->setText(QString("已定位  ·  找到 %1 个站点，推荐结果按距离排序").arg(stations.size()));
                 filtered();
-                map->focusLocation();
             });
     });
     connect(search, &QLineEdit::textChanged, recommendations, [=] { filtered(); });

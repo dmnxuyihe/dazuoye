@@ -28,3 +28,4 @@ Thumbs.db
 desktop/scripts/run-windows.local.cmd
 run-admin.cmd
 run-user.cmd
+start-user.cmd

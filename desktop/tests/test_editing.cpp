@@ -4,6 +4,10 @@
 class EditingTest:public QObject {
     Q_OBJECT
   private slots:
+    void microsecondTimestampFormatting() {
+        QCOMPARE(localDateTime("2026-09-09T12:40:21.678974+00:00"),
+                 QString("2026-09-09 20:40:21"));
+    }
     void imageOperations() {
         AvatarCanvas canvas;QImage source(256,256,QImage::Format_RGB32);source.fill(Qt::red);
         QPainter painter(&source);painter.fillRect(128,0,128,256,Qt::blue);painter.end();
