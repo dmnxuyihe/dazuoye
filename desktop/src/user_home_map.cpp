@@ -90,27 +90,21 @@ void UserWindow::mapPage() {
     panel->addStretch();
 
     auto visibleRows = std::make_shared<QJsonArray>();
-    auto initialLocationFocused = std::make_shared<bool>(false);
     auto showStation = [=](const QString &id) {
         selectedStation = id;
         recommendations->setSelected(id);
-        for (const auto &value : *visibleRows) {
-            const auto station = value.toObject();
-            if (text(station, "id") != id) continue;
-            break;
-        }
     };
     connect(map, &StationMap::stationSelected, recommendations, [=](const QString &id) {
-        *initialLocationFocused = true;
         showStation(id);
+        host->expand();
     });
     connect(recommendations, &StationRecommendations::stationSelected, map, [=](const QString &id) {
-        *initialLocationFocused = true;
         showStation(id);
+        host->expand();
         map->selectStation(id);
     });
     connect(recommendations, &StationRecommendations::navigationRequested, map,
-            [=](const QString &id) { *initialLocationFocused = true; map->navigateToStation(id); });
+            [=](const QString &id) { map->navigateToStation(id); });
     connect(recommendations, &StationRecommendations::stationChosen, this,
             [this](const QString &id) { selectedStation = id; navigate("station"); });
 
@@ -141,10 +135,6 @@ void UserWindow::mapPage() {
     };
     auto generation = std::make_shared<int>(0);
     connect(map, &StationMap::locationChanged, map, [=](double lat, double lon) {
-        if (!*initialLocationFocused) {
-            *initialLocationFocused = true;
-            map->focusLocation();
-        }
         locationState->setText(QString("我的位置：%1, %2  ·  正在查找附近电站…")
             .arg(lat, 0, 'f', 5).arg(lon, 0, 'f', 5));
         const int request = ++*generation;
@@ -158,5 +148,7 @@ void UserWindow::mapPage() {
             });
     });
     connect(search, &QLineEdit::textChanged, recommendations, [=] { filtered(); });
+    mapDataUpdater = filtered;
     filtered();
+    map->requestCurrentLocation();
 }

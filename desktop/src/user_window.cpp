@@ -164,13 +164,14 @@ void UserWindow::refresh() {
                     }
                     return QJsonObject{};
                 };
-                if (body->count() <= 1 || current == "profile" || current == "wallet" || current == "withdrawals" || current == "history" ||
-                    ((current == "home" || current == "map") && stations != previousStations) ||
+                if ((body->count() <= 1 && current != "map") || current == "profile" || current == "wallet" || current == "withdrawals" || current == "history" ||
+                    (current == "home" && stations != previousStations) ||
                     (current == "station" && stationTerms(stations)!=stationTerms(previousStations)) ||
                     (current == "charging" && text(active, "status") != previousStatus))
                     navigate(current);
                 else {
                     updateCharging();
+                    if (current == "map" && stations != previousStations && mapDataUpdater) mapDataUpdater();
                     if (current == "stats") loadStatistics();
                     if (current == "schedule" && stations != previousStations) navigate(current);
                     if (current == "station" && me != previousMe) navigate(current);
@@ -202,7 +203,7 @@ void UserWindow::navigate(const QString &page) {
     for (auto b : root->findChildren<QPushButton *>())
         if (b->isCheckable())
             b->setChecked(b->objectName() == page);
-    statisticsLoader = {}; statisticsHost = nullptr;
+    statisticsLoader = {}; statisticsHost = nullptr; mapDataUpdater = {};
     clearLayout(body);
     vehicleTitle = nullptr;
     chargeEnergy = nullptr; chargeCost = nullptr; chargeState = nullptr;

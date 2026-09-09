@@ -5,7 +5,7 @@ html,body,#map{height:100%;width:100%;margin:0;background:#181321;font-family:sa
 </style></head><body><div id="map"></div><button class="map-tools-toggle" aria-label="定位与路线工具" onclick="document.querySelector('.tools').classList.toggle('open')">定位 / 路线</button><div class="tools"><select aria-label="选择城市" onchange="const p=this.value.split(',').map(Number);if(p.length===2)updateLocation(p[0],p[1])"><option value="">选择城市</option><option value="22.55,114.02">深圳</option><option value="31.23,121.50">上海</option><option value="39.908,116.397">北京</option><option value="23.129,113.264">广州</option><option value="30.274,120.155">杭州</option></select><input id="address" aria-label="输入城市和地址" placeholder="城市和详细地址" style="width:145px"><button onclick="if(bridge)bridge.geocode(document.getElementById('address').value)">解析地址</button><button onclick="fitStations(false)">当前站点区域</button><button onclick="fitStations(true)">全部站点</button><button onclick="locateMe()">我的位置</button><button onclick="pickLocation()">地图选位置</button><button onclick="if(bridge)bridge.navigateTo(selected)">规划路线</button></div><div id="route" style="display:none;position:absolute;right:8px;bottom:44px;z-index:1000;max-height:38%;overflow:auto;max-width:270px;background:#281930ed;color:white;padding:9px;font-size:12px"></div><div id="addresses" style="position:absolute;top:88px;left:48px;z-index:1001;background:#281930;color:white;max-width:75%"></div><div id="status" class="status">正在加载在线地图…</div><script src="leaflet.js"></script><script src="qrc:///qtwebchannel/qwebchannel.js"></script><script>
 'use strict';
 const map=window.map=L.map('map',{zoomControl:true,zoomSnap:.5}).setView([22.55,114.02],12);
-const status=document.getElementById('status');let loaded=0,failed=0,bridge=null,rows=[],selected='',markers=new Map();
+const status=document.getElementById('status');let loaded=0,failed=0,bridge=null,rows=[],selected='',markers=new Map(),cameraMode='manual',cameraTouched=false;
 const tiles=window.tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}).addTo(map);
 tiles.on('loading',()=>{loaded=0;failed=0;status.hidden=false;status.textContent='正在加载在线地图…'});
 tiles.on('tileload',()=>{loaded++;window.loadedTiles=(window.loadedTiles||0)+1});
@@ -19,32 +19,34 @@ function updateLocation(lat,lon,notify=true,focus=true){
  if(notify)clearRoute();
  if(locationMarker) locationMarker.remove();
  locationMarker=L.circleMarker([lat,lon],{radius:8,color:'#fff',fillColor:'#3478f6',fillOpacity:1}).addTo(map).bindTooltip('我的位置');
- if(focus)map.setView([lat,lon],13); if(bridge && notify)bridge.locate(lat,lon);
+ if(focus){cameraMode='user';cameraTouched=true;map.setView([lat,lon],13)} if(bridge && notify)bridge.locate(lat,lon);
  status.hidden=false;status.textContent='已更新我的位置，可选择站点导航';
 }
-window.focusLocation=function(){if(locationMarker)map.flyTo(locationMarker.getLatLng(),15,{duration:.45})};
-function locateMe(){
+window.focusLocation=function(onlyIfUntouched=false){if(onlyIfUntouched&&cameraTouched)return;if(locationMarker){cameraMode='user';cameraTouched=true;clearRoute();map.flyTo(locationMarker.getLatLng(),15,{duration:.45})}};
+window.locateMe=function(automatic=false){
  if(!navigator.geolocation){pickLocation();return}
- navigator.geolocation.getCurrentPosition(p=>updateLocation(p.coords.latitude,p.coords.longitude),()=>{
+ navigator.geolocation.getCurrentPosition(p=>updateLocation(p.coords.latitude,p.coords.longitude,true,!automatic||!cameraTouched),()=>{
+ if(automatic&&locationMarker&&!cameraTouched)window.focusLocation();
  status.hidden=false;status.textContent='无法自动定位，请点击“地图选位置”设置出发点';},{enableHighAccuracy:true,timeout:8000});
 }
 function pickLocation(){picking=true;status.hidden=false;status.textContent='请点击地图设置您的出发位置'}
 map.on('click',e=>{if(picking){picking=false;updateLocation(e.latlng.lat,e.latlng.lng)}});
+map.on('dragstart',()=>{cameraMode='manual';cameraTouched=true});
 function icon(active){return L.divIcon({className:active?'selected':'',html:'<div class="pin"><span>ϟ</span></div>',iconSize:[27,36],iconAnchor:[13,32]})}
 window.fitStations=function(all){if(!rows.length)return;const ref=rows.find(r=>r.id===selected)||rows[0];const group=all?rows:rows.filter(r=>map.distance([r.latitude,r.longitude],[ref.latitude,ref.longitude])<30000);map.fitBounds(group.map(r=>[r.latitude,r.longitude]),{padding:[42,55],maxZoom:15,animate:false})};
 window.setStations=function(payload){
- const previous=selected;const signature=JSON.stringify(payload.rows);const changed=signature!==window.stationSignature;
+ const signature=JSON.stringify(payload.rows);
  rows=payload.rows;selected=payload.selected;window.stationSignature=signature;
  markers.forEach(m=>m.remove());markers.clear();
- rows.forEach(r=>{const name=document.createElement('span');name.textContent=r.name||'充电站';const m=L.marker([r.latitude,r.longitude],{icon:icon(r.id===selected),title:r.name||'充电站'}).addTo(map).bindTooltip(name,{direction:'top',offset:[0,-25],permanent:r.id===selected});m.on('click',()=>{selected=r.id;markers.forEach((other,id)=>other.setIcon(icon(id===selected)));m.openTooltip();if(bridge)bridge.selectStation(r.id)});markers.set(r.id,m)});
- if(!locationMarker && (changed||previous!==selected))fitStations(false);
+ rows.forEach(r=>{const name=document.createElement('span');name.textContent=r.name||'充电站';const m=L.marker([r.latitude,r.longitude],{icon:icon(r.id===selected),title:r.name||'充电站'}).addTo(map).bindTooltip(name,{direction:'top',offset:[0,-25],permanent:r.id===selected});m.on('click',()=>{if(bridge)bridge.selectStation(r.id)});markers.set(r.id,m)});
 };
 window.selectStation=function(id,focus){
  if(!markers.has(id))return;
+ if(focus)clearRoute();
  selected=id;
  markers.forEach((marker,markerId)=>marker.setIcon(icon(markerId===selected)));
  const marker=markers.get(id);marker.openTooltip();
- if(focus)map.flyTo(marker.getLatLng(),15,{duration:.45});
+ if(focus){cameraMode='station';cameraTouched=true;map.flyTo(marker.getLatLng(),15,{duration:.45})}
 };
 let routeLayer=null;
 function clearRoute(){if(routeLayer)routeLayer.remove();routeLayer=null;document.getElementById('route').style.display='none'}
@@ -56,6 +58,7 @@ window.showAddresses=function(addresses){
 };
 window.showRoute=function(route){
  clearRoute();routeLayer=L.geoJSON(route.geometry,{style:{color:'#3478f6',weight:6}}).addTo(map);
+ cameraMode='route';cameraTouched=true;
  map.fitBounds(routeLayer.getBounds(),{padding:[55,70]});
  const host=document.getElementById('route');host.replaceChildren();host.style.display='block';
  const title=document.createElement('strong');title.textContent=(route.distance_m/1000).toFixed(1)+' km · 约'+Math.ceil(route.duration_s/60)+'分钟';host.append(title);

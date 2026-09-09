@@ -39,5 +39,6 @@ class UserWindow : public DesktopWindow {
     QPointer<QLabel> chargeTime, vehicleState, vehicleTitle;
     QPointer<QWidget> statisticsHost;
     std::function<void()> statisticsLoader;
+    std::function<void()> mapDataUpdater;
     QPointer<ArtWidget> batteryArt;
 };

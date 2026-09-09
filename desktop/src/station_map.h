@@ -26,10 +26,11 @@ class StationMap : public QWidget {
     explicit StationMap(QWidget *parent = nullptr);
     void setApi(ApiClient *client);
     void setCompact(bool enabled);
+    void requestCurrentLocation();
     void setLocation(double latitude, double longitude);
     void setStations(const QJsonArray &rows, const QString &selected = {});
     void fitStations(bool allCities = false);
-    void focusLocation();
+    void focusLocation(bool onlyIfUntouched = false);
     void navigateToStation(const QString &id);
     void zoomAt(double factor, const QPointF &anchor);
   public slots:
@@ -49,6 +50,8 @@ class StationMap : public QWidget {
     QString selected;
     bool ready = false, compact = false;
     bool focusLocationWhenReady = false;
+    bool focusOnlyIfUntouchedWhenReady = false;
+    bool locateWhenReady = false;
     double myLatitude = 0, myLongitude = 0;
     bool hasLocation = false;
 };

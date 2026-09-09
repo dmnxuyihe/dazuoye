@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace {
 double distanceOf(const QJsonObject &station) {
@@ -55,6 +56,7 @@ StationRecommendations::StationRecommendations(QWidget *parent) : QWidget(parent
     root->addWidget(scroll);
     connect(summary, &QPushButton::clicked, this, [this] {
         expanded = !expanded;
+        scrollSelectionIntoView = expanded;
         rebuild();
     });
 }
@@ -94,7 +96,7 @@ void StationRecommendations::rebuild() {
             .arg(expanded ? "⌃" : "⌄"));
     summary->setVisible(!expanded);
     scroll->setVisible(expanded && !rows.isEmpty());
-    QWidget *expandedCard = nullptr;
+    QPointer<QWidget> activeCard;
     for (const auto &value : rows) {
         const auto station = value.toObject();
         const QString id = text(station, "id");
@@ -126,13 +128,14 @@ void StationRecommendations::rebuild() {
             }
             selected = id;
             expanded = true;
+            scrollSelectionIntoView = true;
             emit stationSelected(id);
             QTimer::singleShot(0, this, [this] { rebuild(); });
         });
         cards->addWidget(card);
+        if (active) activeCard = card;
         if (active && expanded) {
             auto detail = new QFrame;
-            expandedCard = detail;
             detail->setObjectName("station-expanded-card");
             detail->setStyleSheet(
                 "QFrame#station-expanded-card{background:#251733;border:1px solid #50305f;border-radius:14px;}"
@@ -169,8 +172,16 @@ void StationRecommendations::rebuild() {
         }
     }
     cards->addStretch();
-    QTimer::singleShot(0, scroll, [this, previousScroll, expandedCard] {
+    const bool shouldScroll = std::exchange(scrollSelectionIntoView, false);
+    QMetaObject::invokeMethod(scroll, [this, previousScroll, activeCard, shouldScroll] {
         scroll->verticalScrollBar()->setValue(previousScroll);
-        if (expandedCard) scroll->ensureWidgetVisible(expandedCard, 0, 12);
-    });
+        if (!shouldScroll || !activeCard) return;
+        auto animation = new QPropertyAnimation(scroll->verticalScrollBar(), "value", scroll);
+        animation->setDuration(240);
+        animation->setEasingCurve(QEasingCurve::OutCubic);
+        animation->setStartValue(scroll->verticalScrollBar()->value());
+        animation->setEndValue(qMin(activeCard->y(), scroll->verticalScrollBar()->maximum()));
+        connect(animation, &QPropertyAnimation::finished, animation, &QObject::deleteLater);
+        animation->start();
+    }, Qt::QueuedConnection);
 }

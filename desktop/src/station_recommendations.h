@@ -24,4 +24,5 @@ class StationRecommendations : public QWidget {
     QPushButton *summary;
     QScrollArea *scroll;
     bool expanded = false;
+    bool scrollSelectionIntoView = false;
 };

@@ -94,7 +94,12 @@ StationMap::StationMap(QWidget *parent) : QWidget(parent) {
                     .arg(myLatitude,0,'f',6).arg(myLongitude,0,'f',6));
             if (focusLocationWhenReady) {
                 focusLocationWhenReady = false;
-                view->page()->runJavaScript("window.focusLocation()");
+                view->page()->runJavaScript(focusOnlyIfUntouchedWhenReady
+                    ? "window.focusLocation(true)" : "window.focusLocation(false)");
+            }
+            if (locateWhenReady) {
+                locateWhenReady = false;
+                view->page()->runJavaScript("window.locateMe(true)");
             }
         }
     });
@@ -112,6 +117,10 @@ StationMap::StationMap(QWidget *parent) : QWidget(parent) {
 void StationMap::setCompact(bool enabled) {
     compact = enabled;
     if (ready) view->page()->runJavaScript(QString("document.body.classList.toggle('compact',%1)").arg(enabled ? "true" : "false"));
+}
+void StationMap::requestCurrentLocation() {
+    if (ready) view->page()->runJavaScript("window.locateMe(true)");
+    else locateWhenReady = true;
 }
 void StationMap::setStations(const QJsonArray &rows, const QString &id) {
     stations = {};
@@ -152,13 +161,26 @@ void StationMap::selectStation(const QString &id) {
             return;
         }
 }
-void StationMap::focusLocation() {
+void StationMap::focusLocation(bool onlyIfUntouched) {
     if (!hasLocation) return;
-    if (ready) view->page()->runJavaScript("window.focusLocation()");
-    else focusLocationWhenReady = true;
+    if (ready) view->page()->runJavaScript(
+        onlyIfUntouched ? "window.focusLocation(true)" : "window.focusLocation(false)");
+    else {
+        focusLocationWhenReady = true;
+        focusOnlyIfUntouchedWhenReady = onlyIfUntouched;
+    }
 }
 void StationMap::navigateToStation(const QString &id) {
-    selectStation(id);
+    for (const auto &value : stations) {
+        if (value.toObject()["id"].toString() != id) continue;
+        selected = id;
+        focusLocationWhenReady = false;
+        if (ready)
+            view->page()->runJavaScript("window.selectStation(" +
+                QString::fromUtf8(QJsonDocument(QJsonArray{id}).toJson(QJsonDocument::Compact)) +
+                "[0],false)");
+        break;
+    }
     emit bridge->navigationRequested(id);
 }
 void StationMap::fitStations(bool allCities) {
@@ -199,7 +221,12 @@ void StationMap::setApi(ApiClient *client) {
         if(!isVisible())return;
         api->request("GET","/public/map/preview-location",{},this,[this](const Reply &r) {
             const auto o=r.data.object();const auto stamp=o["updated_at"].toDouble();
-            if(r.ok&&stamp>previewStamp) {previewStamp=stamp;setLocation(o["latitude"].toDouble(),o["longitude"].toDouble());}
+            if(r.ok&&stamp>previewStamp) {
+                const bool initialPreview = previewStamp == 0;
+                previewStamp=stamp;
+                setLocation(o["latitude"].toDouble(),o["longitude"].toDouble());
+                focusLocation(initialPreview);
+            }
         },false);
     });
     poll->start(3000);
