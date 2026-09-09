@@ -160,7 +160,7 @@ void UserWindow::refresh() {
                     }
                     return QJsonObject{};
                 };
-                if (body->count() <= 1 || current == "profile" || current == "history" ||
+                if (body->count() <= 1 || current == "profile" || current == "wallet" || current == "history" ||
                     ((current == "home" || current == "map") && stations != previousStations) ||
                     (current == "station" && stationTerms(stations)!=stationTerms(previousStations)) ||
                     (current == "charging" && text(active, "status") != previousStatus))
@@ -204,6 +204,8 @@ void UserWindow::navigate(const QString &page) {
         history();
     else if (page == "profile")
         profile();
+    else if (page == "wallet")
+        wallet();
     else
         home();
     body->addStretch();
@@ -666,111 +668,102 @@ void UserWindow::schedule() {
 void UserWindow::profile() {
     body->addWidget(pageHeading("个人中心", this, [this] { navigate("home"); }));
     QVBoxLayout *l;
-    auto wallet = card("", &l);
-    wallet->setStyleSheet(
+    auto account = card("", &l);
+    account->setStyleSheet(
         "QFrame#card{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #422158,stop:.5 "
         "#2b183d,stop:1 #1a112a);border:1px solid #684073;border-radius:20px;}");
     auto header = new QHBoxLayout;
-    auto avatar = label(api->authenticated() ? text(me, "nickname", "E").left(1) : "E",
-                        "font-size:23px;font-weight:600;background:#9455b4;border-radius:24px;");
-    avatar->setAlignment(Qt::AlignCenter);
-    avatar->setFixedSize(48, 48);
+    header->setSpacing(16);
+    auto avatar = button(api->authenticated() ? text(me, "nickname", "E").left(1) : "E", this, [this] {
+        if (!api->authenticated()) { login(); return; }
+        QImage currentAvatar;
+        currentAvatar.loadFromData(QByteArray::fromBase64(text(me,"avatar_data").toLatin1()),"PNG");
+        showAvatarEditor(this,api,[this](const QJsonObject &account){me=account;navigate("profile");},currentAvatar);
+    });
+    avatar->setStyleSheet("font-size:23px;font-weight:600;background:#9455b4;border:0;border-radius:28px;padding:0;");
+    avatar->setFixedSize(56, 56);
     auto avatarData = QByteArray::fromBase64(text(me,"avatar_data","").toUtf8());
-    if (!avatarData.isEmpty()) { QPixmap pix; pix.loadFromData(avatarData,"PNG"); if (!pix.isNull()) avatar->setPixmap(pix.scaled(48,48,Qt::KeepAspectRatio,Qt::SmoothTransformation)); }
+    if (!avatarData.isEmpty()) { QPixmap pix; pix.loadFromData(avatarData,"PNG"); if (!pix.isNull()) avatar->setIcon(QIcon(pix)); avatar->setIconSize(QSize(56,56)); }
     header->addWidget(avatar);
-    auto identity = new QVBoxLayout;
-    identity->setSpacing(4);
-    identity->addWidget(
-        label(api->authenticated() ? text(me, "nickname", "充电用户") : "欢迎来到 ELECTRA",
-              "font-size:18px;font-weight:600;"));
-    identity->addWidget(label(api->authenticated() ? text(me, "phone") : "让每一次出发，充满能量",
-                              "font-size:11px;color:#baa1c9;"));
-    header->addLayout(identity, 1);
+    header->addWidget(label(api->authenticated() ? text(me, "nickname", "充电用户") : "欢迎来到 ELECTRA",
+                            "font-size:18px;font-weight:600;"), 1);
+    auto edit = button("编辑", this, [this] {
+        if (!api->authenticated()) { login(); return; }
+        editForm(this, api, "个人资料", "PATCH", "/me", {{"nickname", "昵称"}},
+                 {{"nickname", me.value("nickname")}}, [this] { refresh(); });
+    });
+    edit->setIcon(appIcon("settings"));
+    edit->setIconSize(QSize(18,18));
+    edit->setFixedWidth(82);
+    header->addWidget(edit, 0, Qt::AlignRight | Qt::AlignVCenter);
     l->addLayout(header);
-    l->addSpacing(18);
     if (!api->authenticated()) {
+        l->addSpacing(12);
         l->addWidget(picture("ev-photo.png", 160));
         l->addWidget(button("手机号验证码登录", this, [this] { login(); }, true));
-        body->addWidget(wallet);
+        body->addWidget(account);
         body->addWidget(
             emptyPanel("开启你的充电旅程", "登录后预约充电、查看账单与管理钱包。", "car"));
         body->addWidget(button("刷新网络连接", this, [this] { refresh(); }));
         return;
     }
-    l->addWidget(label("钱包可用余额", "font-size:12px;color:#c1a7d0;"));
-    l->addWidget(label("¥ " + money(me.contains("available_balance") ? number(me, "available_balance") : number(me,"balance")), "font-size:38px;font-weight:600;"));
-    l->addWidget(label("总余额 ¥"+money(number(me,"balance"))+" · 冻结 ¥"+money(number(me,"held_balance")),muted));
-    l->addWidget(button(
-        "钱包充值", this,
-        [this] {
-            editForm(this, api, "钱包充值", "POST", "/wallet/recharges",
-                     {{"amount", "充值金额（元）"}}, {{"idempotency_key", uid()}},
-                     [this] { refresh(); });
-        },
-        true));
-    body->addWidget(wallet);
-    QVBoxLayout *menu;
-    auto panel = card("账户与服务", &menu);
-    menu->setSpacing(2);
-    auto entry = [&](const QString &name, const QString &icon, std::function<void()> fn) {
-        auto b = button(name + "     ›", this, fn);
-        b->setIcon(appIcon(icon));
-        b->setIconSize(QSize(20, 20));
-        b->setStyleSheet("QPushButton{text-align:left;padding:17px "
-                         "8px;background:transparent;border:0;border-bottom:1px solid "
-                         "#382442;border-radius:0;}QPushButton:hover{background:#352041;}");
-        menu->addWidget(b);
+    body->addWidget(account);
+
+    auto balances = new QWidget;
+    auto balanceRow = new QHBoxLayout(balances);
+    balanceRow->setContentsMargins(0,4,0,4);
+    balanceRow->setSpacing(0);
+    auto metric = [](const QString &amount, const QString &caption) {
+        auto w = new QWidget;
+        auto box = new QVBoxLayout(w);
+        box->setContentsMargins(0,0,0,0);
+        box->setSpacing(5);
+        auto value = label(amount, "font-size:22px;font-weight:600;");
+        auto name = label(caption, "font-size:11px;color:#b3a0c2;");
+        value->setAlignment(Qt::AlignCenter); name->setAlignment(Qt::AlignCenter);
+        box->addWidget(value); box->addWidget(name);
+        return w;
     };
-    entry("个人资料", "users", [this] {
-        editForm(this, api, "个人资料", "PATCH", "/me", {{"nickname", "昵称"}},
-                 {{"nickname", me.value("nickname")}}, [this] { refresh(); });
-    });
-    entry("车辆绑定与电量", "car", [this] {
+    balanceRow->addWidget(metric("¥"+money(number(me,"balance")), "总金额"), 1);
+    balanceRow->addWidget(metric("¥"+money(me.contains("available_balance") ? number(me,"available_balance") : number(me,"balance")), "可用余额"), 1);
+    balanceRow->addWidget(metric("¥"+money(number(me,"held_balance")), "待提现"), 1);
+    body->addWidget(balances);
+
+    QVBoxLayout *shortcutLayout;
+    auto shortcuts = card("", &shortcutLayout);
+    auto shortcutRow = new QHBoxLayout;
+    shortcutRow->setContentsMargins(0,0,0,0);
+    shortcutRow->setSpacing(10);
+    auto shortcut = [this,shortcutRow](const QString &name, const QString &icon, std::function<void()> action) {
+        auto b = new NavButton(name, icon, true);
+        b->setCheckable(false);
+        b->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
+        connect(b,&QPushButton::clicked,this,std::move(action));
+        shortcutRow->addWidget(b,1);
+    };
+    shortcut("钱包", "chart", [this] { navigate("wallet"); });
+    shortcut("我的车辆", "car", [this] {
         editForm(this,api,"绑定车辆（账户同步）","PUT","/me/vehicle",
             {{"vehicle_name","车型"},{"vehicle_plate","车牌"},{"battery_kwh","电池容量 kWh"},{"vehicle_soc","当前电量 %"},{"charge_limit","默认充电上限 %"}},
             {{"vehicle_name",me.value("vehicle_name")},{"vehicle_plate",me.value("vehicle_plate")},{"battery_kwh",me.contains("battery_kwh")?me.value("battery_kwh"):QJsonValue(60)},
              {"vehicle_soc",batterySoc()},{"charge_limit",me.contains("charge_limit")?me.value("charge_limit"):QJsonValue(80)}},
             [this]{active={};refresh();});
     });
-    entry("更换头像", "user", [this] {
-        QImage currentAvatar;currentAvatar.loadFromData(QByteArray::fromBase64(text(me,"avatar_data").toLatin1()),"PNG");
-        showAvatarEditor(this,api,[this](const QJsonObject &account){me=account;navigate("profile");},currentAvatar);
-    });
-    entry("申请提现", "chart", [this] {
+    shortcut("提现", "arrow", [this] {
         editForm(this,api,"申请提现（审核后模拟到账）","POST","/wallet/withdrawals",
             {{"amount","提现金额（元）"},{"destination","演示收款账户"}},{{"idempotency_key",uid()},{"destination","演示钱包"}},[this]{refresh();});
     });
-    entry("提现进度", "chart", [this] {
-        api->get("/me/withdrawals",this,[this](const Reply &r){if(r.ok)showDetail(this,"提现申请与审核记录",{{"提现记录",r.data.array()}});else message(r);});
-    });
-    entry("订单历史", "history", [this] { navigate("history"); });
-    entry("钱包流水", "chart", [this] {
-        auto d = new QDialog(this);
-        d->setAttribute(Qt::WA_DeleteOnClose);
-        d->setWindowTitle("钱包流水");
-        auto l = new QVBoxLayout(d);
-        l->addWidget(dialogHeader(d, label("钱包收支", "font-size:22px;font-weight:600;")));
-        auto scroll = new QScrollArea;
-        scroll->setWidgetResizable(true);
-        auto content = new QWidget;
-        auto rows = new QVBoxLayout(content);
-        for (auto v : ledger) {
-            auto o = v.toObject();
-            rows->addWidget(detailLine("chart", statusText(text(o, "entry_type")),
-                                       "¥" + money(number(o, "amount"))));
-            rows->addWidget(label(localDateTime(text(o, "created_at")), "font-size:10px;color:#957ba8;"));
-        }
-        if (ledger.isEmpty())
-            rows->addWidget(emptyPanel("暂无钱包流水", "充值或结算后会在此记录。", "chart"));
-        rows->addStretch();
-        scroll->setWidget(content);
-        l->addWidget(scroll);
-        d->resize(440, 550);
-        d->show();
-    });
-    entry("分时用电", "bolt", [this] { navigate("schedule"); });
-    entry("刷新账户", "settings", [this] { refresh(); });
-    body->addWidget(panel);
+    shortcutLayout->addLayout(shortcutRow);
+    body->addWidget(shortcuts);
+
+    QVBoxLayout *historyLayout;
+    auto historyCard = card("", &historyLayout);
+    auto historyButton = button("订单历史     ›", this, [this] { navigate("history"); });
+    historyButton->setIcon(appIcon("history"));
+    historyButton->setIconSize(QSize(20,20));
+    historyButton->setStyleSheet("QPushButton{text-align:left;padding:17px 8px;background:transparent;border:0;}QPushButton:hover{background:#352041;}");
+    historyLayout->addWidget(historyButton);
+    body->addWidget(historyCard);
     auto logout = button("退出登录", this, [this] {
         api->logout();
         if (refreshContext) delete refreshContext;
@@ -783,6 +776,80 @@ void UserWindow::profile() {
     });
     logout->setProperty("quiet", true);
     body->addWidget(logout);
+}
+void UserWindow::wallet() {
+    body->addWidget(pageHeading("我的钱包", this, [this] { navigate("profile"); }));
+    if (!api->authenticated()) {
+        body->addWidget(button("请先登录", this, [this] { login(); }, true));
+        return;
+    }
+    auto balances = new QWidget;
+    auto balanceRow = new QHBoxLayout(balances);
+    balanceRow->setContentsMargins(0,6,0,8); balanceRow->setSpacing(0);
+    auto metric = [](const QString &amount, const QString &caption) {
+        auto w = new QWidget; auto box = new QVBoxLayout(w);
+        box->setContentsMargins(0,0,0,0); box->setSpacing(5);
+        auto value=label(amount,"font-size:22px;font-weight:600;");
+        auto name=label(caption,"font-size:11px;color:#b3a0c2;");
+        value->setAlignment(Qt::AlignCenter); name->setAlignment(Qt::AlignCenter);
+        box->addWidget(value); box->addWidget(name); return w;
+    };
+    balanceRow->addWidget(metric("¥"+money(number(me,"balance")),"总金额"),1);
+    balanceRow->addWidget(metric("¥"+money(me.contains("available_balance")?number(me,"available_balance"):number(me,"balance")),"可用余额"),1);
+    balanceRow->addWidget(metric("¥"+money(number(me,"held_balance")),"待提现"),1);
+    body->addWidget(balances);
+
+    auto actions = new QHBoxLayout;
+    actions->setSpacing(12);
+    actions->addWidget(button("充值",this,[this]{
+        editForm(this,api,"钱包充值","POST","/wallet/recharges",{{"amount","充值金额（元）"}},{{"idempotency_key",uid()}},[this]{refresh();});
+    },true),1);
+    actions->addWidget(button("提现",this,[this]{
+        editForm(this,api,"申请提现（审核后模拟到账）","POST","/wallet/withdrawals",
+            {{"amount","提现金额（元）"},{"destination","演示收款账户"}},{{"idempotency_key",uid()},{"destination","演示钱包"}},[this]{refresh();});
+    }),1);
+    body->addLayout(actions);
+
+    QVBoxLayout *recordsLayout;
+    auto records = card("",&recordsLayout);
+    recordsLayout->setSpacing(10);
+    auto tabs = new Segments({"资金记录","消费记录"},walletFilter);
+    connect(tabs,&Segments::changed,this,[this](int n){walletFilter=n;navigate("wallet");});
+    recordsLayout->addWidget(tabs);
+    auto scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setMinimumHeight(360);
+    auto content = new QWidget;
+    auto rows = new QVBoxLayout(content);
+    rows->setContentsMargins(0,0,0,0); rows->setSpacing(8);
+    int shown=0;
+    for (auto value : ledger) {
+        auto entry=value.toObject();
+        const auto type=text(entry,"entry_type");
+        if ((walletFilter==1)!=(type=="charge")) continue;
+        ++shown;
+        auto item=new QFrame;
+        item->setObjectName("walletRecord");
+        item->setStyleSheet("QFrame#walletRecord{background:#21152c;border:1px solid #3e2949;border-radius:12px;}");
+        auto line=new QHBoxLayout(item); line->setContentsMargins(13,10,13,10);
+        auto info=new QVBoxLayout; info->setSpacing(3);
+        info->addWidget(label(statusText(type),"font-size:12px;font-weight:600;"));
+        info->addWidget(label(localDateTime(text(entry,"created_at")),"font-size:10px;color:#957ba8;"));
+        line->addLayout(info,1);
+        const double amount=number(entry,"amount");
+        auto amountLabel=label(QString(amount>=0?"+¥%1":"-¥%1").arg(money(std::abs(amount))),
+            QString("font-size:15px;font-weight:600;color:%1;").arg(amount>=0?"#7ad8c8":"#d983e1"));
+        amountLabel->setAlignment(Qt::AlignRight|Qt::AlignVCenter);
+        line->addWidget(amountLabel);
+        rows->addWidget(item);
+    }
+    if (!shown) rows->addWidget(emptyPanel(walletFilter?"暂无消费记录":"暂无资金记录","充值、提现或结算后会在此记录。","chart"));
+    rows->addStretch();
+    scroll->setWidget(content);
+    recordsLayout->addWidget(scroll,1);
+    body->addWidget(records,1);
 }
 void UserWindow::history() {
     body->addWidget(pageHeading("我的充电订单", this, [this] { navigate("profile"); }));
