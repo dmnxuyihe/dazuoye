@@ -84,8 +84,11 @@ void UserWindow::mapPage() {
     auto details = new QVBoxLayout(detail);
     auto name = label("", "font-size:20px;font-weight:600;");
     auto meta = label("", "color:#d8c4e5;font-size:12px;");
-    auto go = button("导航到这个充电站", this, [] {}, true);
-    details->addWidget(name); details->addWidget(meta); details->addWidget(go);
+    auto actions = new QHBoxLayout;
+    auto chargeHere = button("选择此站并充电", this, [] {}, true);
+    auto go = button("导航到此站", this, [] {});
+    actions->addWidget(chargeHere, 2); actions->addWidget(go, 1);
+    details->addWidget(name); details->addWidget(meta); details->addLayout(actions);
     body->addWidget(detail);
 
     auto visibleRows = std::make_shared<QJsonArray>();
@@ -97,7 +100,8 @@ void UserWindow::mapPage() {
             const auto station = value.toObject();
             if (text(station, "id") != id) continue;
             name->setText(text(station, "name"));
-            const bool located = station.value("distance_km").isDouble();
+            const bool located = !station.value("distance_km").isNull() &&
+                                 !station.value("distance_km").isUndefined();
             meta->setText(QString("%1%2  ·  空闲 %3/%4")
                 .arg(located ? money(number(station, "distance_km")) + " km  ·  " : "")
                 .arg(text(station, "address"))
@@ -109,6 +113,7 @@ void UserWindow::mapPage() {
     connect(map, &StationMap::stationSelected, recommendations, showStation);
     connect(recommendations, &StationRecommendations::stationSelected, detail, showStation);
     connect(go, &QPushButton::clicked, map, [=] { map->navigateToStation(selectedStation); });
+    connect(chargeHere, &QPushButton::clicked, this, [this] { navigate("station"); });
 
     auto filtered = [=] {
         *visibleRows = {};
@@ -124,8 +129,9 @@ void UserWindow::mapPage() {
             auto nearest = visibleRows->first().toObject();
             for (const auto &value : *visibleRows) {
                 const auto candidate = value.toObject();
-                if (candidate.value("distance_km").isDouble() &&
-                    (!nearest.value("distance_km").isDouble() ||
+                if (!candidate.value("distance_km").isNull() &&
+                    !candidate.value("distance_km").isUndefined() &&
+                    (nearest.value("distance_km").isNull() || nearest.value("distance_km").isUndefined() ||
                      number(candidate, "distance_km") < number(nearest, "distance_km"))) nearest = candidate;
             }
             selectedStation = text(nearest, "id");

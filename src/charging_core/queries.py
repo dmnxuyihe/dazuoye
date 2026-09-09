@@ -37,6 +37,10 @@ async def station_list(
     result = []
     for row in rows:
         station = dict(row)
+        # FastAPI may serialize Decimal as a JSON string. Distances are display/sort
+        # values, so expose them as JSON numbers for every client.
+        if station["distance_km"] is not None:
+            station["distance_km"] = float(station["distance_km"])
         station["tariff"] = tariff_rows(station["tariff"], station["unit_price"])
         result.append(station)
     return result

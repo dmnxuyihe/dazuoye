@@ -7,7 +7,10 @@
 namespace {
 double distanceOf(const QJsonObject &station) {
     const auto value = station.value("distance_km");
-    return value.isDouble() ? value.toDouble() : std::numeric_limits<double>::max();
+    if (value.isNull() || value.isUndefined()) return std::numeric_limits<double>::max();
+    bool valid = false;
+    const double distance = value.toVariant().toDouble(&valid);
+    return valid ? distance : std::numeric_limits<double>::max();
 }
 
 QString distanceText(const QJsonObject &station) {
@@ -23,19 +26,19 @@ StationRecommendations::StationRecommendations(QWidget *parent) : QWidget(parent
     auto root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(8);
-    hint = label("推荐充电站  ·  左右滑动查看更多", "color:#b3a0c2;font-size:12px;");
+    hint = label("推荐充电站  ·  上下滑动查看更多", "color:#b3a0c2;font-size:12px;");
     root->addWidget(hint);
     auto scroll = new QScrollArea;
     scroll->setObjectName("recommendation-scroll");
     scroll->setWidgetResizable(true);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setFixedHeight(142);
+    scroll->setFixedHeight(286);
     scroll->viewport()->setAttribute(Qt::WA_AcceptTouchEvents);
     QScroller::grabGesture(scroll->viewport(), QScroller::LeftMouseButtonGesture);
     auto host = new QWidget;
-    cards = new QHBoxLayout(host);
+    cards = new QVBoxLayout(host);
     cards->setContentsMargins(0, 0, 0, 4);
     cards->setSpacing(10);
     cards->addStretch();
@@ -64,7 +67,7 @@ void StationRecommendations::setSelected(const QString &stationId) {
 void StationRecommendations::rebuild() {
     clearLayout(cards);
     hint->setText(rows.isEmpty() ? "暂无匹配站点，请定位或扩大搜索范围"
-                                 : "推荐充电站  ·  按距离由近到远  ·  左右滑动查看更多");
+                                 : "推荐充电站  ·  按距离由近到远  ·  上下滑动查看更多");
     for (const auto &value : rows) {
         const auto station = value.toObject();
         const QString id = text(station, "id");
@@ -75,8 +78,8 @@ void StationRecommendations::rebuild() {
         card->setCheckable(true);
         card->setChecked(active);
         card->setCursor(Qt::PointingHandCursor);
-        card->setFixedWidth(205);
-        card->setMinimumHeight(116);
+        card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        card->setMinimumHeight(104);
         card->setText(QString("%1\n%2  ·  空闲 %3/%4\n%5")
             .arg(text(station, "name", "充电站"), distanceText(station))
             .arg(qRound(number(station, "available_count")))

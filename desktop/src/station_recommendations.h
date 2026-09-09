@@ -17,6 +17,6 @@ class StationRecommendations : public QWidget {
     void rebuild();
     QString selected;
     QJsonArray rows;
-    QHBoxLayout *cards;
+    QVBoxLayout *cards;
     QLabel *hint;
 };
