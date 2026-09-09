@@ -11,6 +11,40 @@
 namespace {
 QString big = "font-size:30px;font-weight:600;";
 QString muted = "color:#b3a0c2;font-size:12px;";
+
+QFrame *statisticsSummary(QLabel **energyValue, QLabel **amountValue, QLabel **orderValue) {
+    auto frame = new QFrame;
+    frame->setObjectName("personal-statistics");
+    frame->setStyleSheet(
+        "QFrame#personal-statistics{background:#21152f;border:1px solid #604074;"
+        "border-radius:12px;}QFrame#statistics-divider{background:#4b365b;border:0;}"
+    );
+    auto grid = new QGridLayout(frame);
+    grid->setContentsMargins(14, 12, 14, 12);
+    grid->setHorizontalSpacing(12);
+
+    const QString valueStyle = "font-size:18px;font-weight:600;color:#f6edff;";
+    const QStringList captions = {"充电量（kWh）", "消费金额", "订单数"};
+    QLabel **values[] = {energyValue, amountValue, orderValue};
+    for (int i = 0; i < 3; ++i) {
+        const int column = i * 2;
+        auto caption = label(captions[i], muted);
+        caption->setAlignment(Qt::AlignCenter);
+        grid->addWidget(caption, 0, column);
+        *values[i] = label("—", valueStyle);
+        (*values[i])->setAlignment(Qt::AlignCenter);
+        (*values[i])->setMinimumWidth(0);
+        grid->addWidget(*values[i], 1, column);
+        grid->setColumnStretch(column, 1);
+        if (i < 2) {
+            auto divider = new QFrame;
+            divider->setObjectName("statistics-divider");
+            divider->setFixedWidth(1);
+            grid->addWidget(divider, 0, column + 1, 2, 1);
+        }
+    }
+    return frame;
+}
 } // namespace
 void UserWindow::statistics() {
     body->addWidget(pageHeading("个人充电账单",this,[this]{navigate("home");}));
@@ -23,12 +57,12 @@ void UserWindow::statistics() {
     auto host = new QWidget;
     statisticsHost = host;
     auto rows = new QVBoxLayout(host); rows->setContentsMargins(0,0,0,0);
-    auto totals = label("正在读取个人账单…"); totals->setObjectName("personal-statistics");
+    QLabel *energyValue = nullptr, *amountValue = nullptr, *orderValue = nullptr;
+    auto totals = statisticsSummary(&energyValue, &amountValue, &orderValue);
     auto graph = new DataGraphic(DataGraphic::GroupedBars); graph->setFixedHeight(250);
     auto breakdown = new QWidget; auto details = new QVBoxLayout(breakdown);
     details->setContentsMargins(0,0,0,0);
     rows->addWidget(graph); rows->addWidget(totals); rows->addWidget(breakdown);
-    rows->addWidget(label("按付款时间统计 · 北京时间 · 全量个人订单",muted));
     body->addWidget(host);
     auto generation = std::make_shared<int>(0);
     statisticsLoader = [=] {
@@ -36,13 +70,26 @@ void UserWindow::statistics() {
         api->get(QString("/me/statistics?period=")+(statsPeriod ? "all":"month"),host,[=](const Reply &r) {
             if (epoch != *generation) return;
             if (!r.ok || r.cached) message(r);
-            if (!r.ok) { totals->setText(r.error); return; }
+            if (!r.ok) {
+                energyValue->setText("读取失败");
+                amountValue->setText("—");
+                orderValue->setText("—");
+                return;
+            }
             const auto data = r.data.object(); const auto daily = data.value("daily").toArray();
             double energy=0,amount=0; int count=0; QList<double> values; QStringList dates;
             for (auto v : daily) { auto o=v.toObject(); energy+=number(o,"energy_kwh");amount+=number(o,"amount");count+=int(number(o,"orders"));
                 values<<number(o,"amount");dates<<text(o,"day").mid(5); }
             graph->setData({values},dates,"元");
-            totals->setText(QString("%1 kWh    ¥%2    %3 笔已支付订单").arg(money(energy),money(amount)).arg(count));
+            const QString energyText = money(energy);
+            const int energyFontSize = energyText.size() > 12 ? 13 : energyText.size() > 9 ? 15
+                                                                          : energyText.size() > 6 ? 17
+                                                                                                : 18;
+            energyValue->setStyleSheet(
+                QString("font-size:%1px;font-weight:600;color:#f6edff;").arg(energyFontSize));
+            energyValue->setText(energyText);
+            amountValue->setText("¥" + money(amount));
+            orderValue->setText(QString::number(count) + " 笔");
             clearLayout(details);
             if (daily.isEmpty()) details->addWidget(label("暂无已支付账单，完成充电并付款后显示统计。",muted));
             auto stations=data.value("stations").toArray(); double max=0;

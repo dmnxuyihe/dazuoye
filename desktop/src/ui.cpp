@@ -320,16 +320,21 @@ QWidget *dialogHeader(QDialog *dialog, QLabel *title) {
     header->setObjectName("dialog-header");
     auto layout = new QHBoxLayout(header);
     layout->setContentsMargins(0, 0, 0, 4);
+    auto balance = new QWidget(header);
+    balance->setFixedWidth(40);
+    layout->addWidget(balance);
     title->setWordWrap(true);
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet(title->styleSheet() + "font-weight:700;");
     layout->addWidget(title, 1);
-    auto close = new QPushButton("× 关闭", header);
+    auto close = new QPushButton("×", header);
     close->setObjectName("dialog-close");
     close->setAccessibleName("关闭弹窗");
     close->setToolTip("关闭弹窗（Esc）");
     close->setCursor(Qt::PointingHandCursor);
     close->setAutoDefault(false);
     close->setDefault(false);
-    close->setMinimumSize(84, 40);
+    close->setFixedSize(40, 40);
     layout->addWidget(close, 0, Qt::AlignTop);
     QObject::connect(close, &QPushButton::clicked, dialog, &QDialog::reject);
     return header;
@@ -340,8 +345,6 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
     d->setWindowTitle(title);
     auto l = new QVBoxLayout(d);
     l->addWidget(dialogHeader(d, label(title, "font-size:22px;")));
-    auto scroll = new QScrollArea;
-    scroll->setWidgetResizable(true);
     auto content = new QWidget;
     auto form = new QFormLayout(content);
     form->setContentsMargins(14, 14, 14, 14);
@@ -399,8 +402,7 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
         content->setTextInteractionFlags(Qt::TextSelectableByMouse);
         form->addRow(field, content);
     }
-    scroll->setWidget(content);
-    l->addWidget(scroll);
+    l->addWidget(content);
     l->addWidget(button("关闭", d, [d] { d->accept(); }, true));
     d->resize(620, 560);
     d->show();

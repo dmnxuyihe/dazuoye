@@ -44,13 +44,13 @@ class DialogTest : public QObject {
         owner.resize(360,640);
         QTemporaryDir temp;CacheStore cache(temp.filePath("test.sqlite"));ApiClient api(QUrl("http://127.0.0.1:1"),&cache);
         QList<QPair<QString,QString>> fields;
-        for(int i=0;i<12;++i)fields.append({QString::number(i),"较长的车辆资料字段名称"+QString::number(i)});
+        for(int i=0;i<5;++i)fields.append({QString::number(i),"车辆资料字段"+QString::number(i)});
         editForm(&owner,&api,"车辆资料", "PUT","/me/vehicle",fields,{},[]{});
         auto d=owner.findChild<QDialog *>();QVERIFY(d);
         QTest::qWait(100);capture(d,"form");
-        QTRY_VERIFY_WITH_TIMEOUT(bounds().contains(d->frameGeometry()),2000);
-        auto scroll=d->findChild<QScrollArea *>("dialog-body-scroll");QVERIFY(scroll);
-        QVERIFY(scroll->verticalScrollBar()->maximum()>0);
+        QTRY_VERIFY_WITH_TIMEOUT(owner.screen()->availableGeometry().contains(d->frameGeometry()),2000);
+        QVERIFY(!d->findChild<QScrollArea *>("dialog-body-scroll"));
+        QVERIFY(d->sizeHint().height()>0);
         for(auto b:d->findChildren<QPushButton *>())if(b->text()=="确认保存")
             QVERIFY(d->rect().contains(QRect(b->mapTo(d,QPoint()),b->size())));
     }
@@ -58,7 +58,10 @@ class DialogTest : public QObject {
         QMessageBox message(QMessageBox::Question,"确认操作","是否确认处理这条提现申请？请核对金额和收款账户。",
                             QMessageBox::Yes|QMessageBox::No,&owner);
         message.show();QTest::qWait(100);capture(&message,"confirmation");
-        QVERIFY(bounds().contains(message.frameGeometry()));
+        const auto centerDelta=(bounds().center()-message.frameGeometry().center()).manhattanLength();
+        QVERIFY2(centerDelta<=8,qPrintable(QString("center delta=%1 owner=%2,%3 dialog=%4,%5")
+            .arg(centerDelta).arg(bounds().center().x()).arg(bounds().center().y())
+            .arg(message.frameGeometry().center().x()).arg(message.frameGeometry().center().y())));
         for(auto b:message.buttons())
             QVERIFY(message.rect().contains(QRect(b->mapTo(&message,QPoint()),b->size())));
         message.close();

@@ -105,7 +105,7 @@ void UserWindow::profile() {
     };
     shortcut("钱包", "chart", [this] { navigate("wallet"); });
     shortcut("我的车辆", "car", [this] {
-        editForm(this,api,"绑定车辆（账户同步）","PUT","/me/vehicle",
+        editForm(this,api,"绑定车辆","PUT","/me/vehicle",
             {{"vehicle_name","车型"},{"vehicle_plate","车牌"},{"battery_kwh","电池容量 kWh"},{"vehicle_soc","当前电量 %"},{"charge_limit","默认充电上限 %"}},
             {{"vehicle_name",me.value("vehicle_name")},{"vehicle_plate",me.value("vehicle_plate")},{"battery_kwh",me.contains("battery_kwh")?me.value("battery_kwh"):QJsonValue(60)},
              {"vehicle_soc",batterySoc()},{"charge_limit",me.contains("charge_limit")?me.value("charge_limit"):QJsonValue(80)}},
@@ -179,7 +179,7 @@ void UserWindow::wallet() {
         editForm(this,api,"钱包充值","POST","/wallet/recharges",{{"amount","充值金额（元）"}},{{"idempotency_key",uid()}},[this]{refresh();});
     },true),1);
     actions->addWidget(button("提现",this,[this]{
-        editForm(this,api,"申请提现（审核后模拟到账）","POST","/wallet/withdrawals",
+        editForm(this,api,"申请提现","POST","/wallet/withdrawals",
             {{"amount","提现金额（元）"},{"destination","演示收款账户"}},{{"idempotency_key",uid()},{"destination","演示钱包"}},[this]{refresh();});
     }),1);
     body->addLayout(actions);
@@ -270,7 +270,7 @@ void UserWindow::withdrawalsPage() {
     countRow->addWidget(countBlock(rejectedCount,"已驳回"),1);
     body->addWidget(counts);
     body->addWidget(button("申请提现",this,[this]{
-        editForm(this,api,"申请提现（审核后模拟到账）","POST","/wallet/withdrawals",
+        editForm(this,api,"申请提现","POST","/wallet/withdrawals",
             {{"amount","提现金额（元）"},{"destination","演示收款账户"}},
             {{"idempotency_key",uid()},{"destination","演示钱包"}},[this]{refresh();});
     },true));
