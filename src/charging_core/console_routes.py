@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Response, HTTPException, Query
-from .forecast import load_forecast
+from .forecast import console_forecast, console_scopes, load_forecast
 from pydantic import BaseModel, Field, field_validator
 from .service import ChargingService
 
@@ -64,15 +64,19 @@ def build_console_router(get_service, require_admin):
 
     @router.get("/console/forecast")
     async def forecast(
-        _: Admin, scope: str = Query(default="all", pattern=r"^(all|[0-9]{1,6})$")
+        _: Admin,
+        scope: str = Query(
+            default="business", pattern=r"^(all|business|station-[0-9]{1,6})$"
+        ),
     ):
         artifact = load_forecast()
         if artifact is None:
             return {"ready": False, "message": "尚未生成历史预测，请运行训练脚本。"}
-        result = artifact["results"].get(scope)
+        result = console_forecast(artifact, scope)
         if result is None:
             raise HTTPException(status_code=404, detail="区域不存在")
-        return {**artifact["metadata"], "scope": scope, **result}
+        metadata = {**artifact["metadata"], "scopes": console_scopes()}
+        return {**metadata, "scope": scope, **result}
 
     @router.get("/console/settings")
     async def settings(_: Admin, s: Service):

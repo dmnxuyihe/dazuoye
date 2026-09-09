@@ -3,10 +3,21 @@
 #include "visuals.h"
 #include <QJsonArray>
 #include <QSaveFile>
+#include <QToolTip>
 #include <QtCharts>
+#include <limits>
 
 namespace {
 const QStringList colors = {"#ce7bda", "#efb95d", "#9161cf", "#7ad8c8"};
+class ContainedScrollArea final : public QScrollArea {
+protected:
+    void wheelEvent(QWheelEvent *event) override {
+        QScrollArea::wheelEvent(event);
+        // A wheel event ignored at either end of an inner list is otherwise forwarded to the
+        // page scroll area, which makes the whole dashboard visibly jump.
+        event->accept();
+    }
+};
 QChart *baseChart(const QString &title) {
     auto c = new QChart;
     c->setTitle(title);
@@ -122,8 +133,47 @@ QString actionLabel(QString a) {
         {"order.reserve", "订单已预约"},       {"order.start", "开始充电"},
         {"order.stop", "充电已停止"},          {"order.cancel", "预约已取消"},
         {"wallet.adjustment", "余额已调整"},   {"wallet.refund", "退款已处理"},
-        {"console.settings", "运营设置已更新"}};
-    return map.contains(a) ? map.value(a) : a.replace('.', " · ");
+        {"console.settings", "运营设置已更新"}, {"charger.status_changed", "电桩状态已变更"},
+        {"station.updated", "站点资料已更新"}, {"station.created", "站点已创建"},
+        {"user.created", "用户已创建"}, {"withdrawal.paid", "提现已通过并到账"},
+        {"withdrawal.rejected", "提现已驳回"}, {"wallet.adjusted", "余额已调整"}};
+    return map.contains(a) ? map.value(a) : "其他操作";
+}
+QString userNumber(const QJsonObject &user) {
+    const int year = QDateTime::fromString(text(user, "created_at"), Qt::ISODate).date().year();
+    QString hex = text(user, "id");
+    hex.remove('-');
+    bool ok = false;
+    const quint32 seed = hex.right(8).toUInt(&ok, 16);
+    return QString("11%1%2")
+        .arg(year > 0 ? year : QDate::currentDate().year(), 4, 10, QChar('0'))
+        .arg(ok ? seed % 10000 : qHash(hex) % 10000, 4, 10, QChar('0'));
+}
+QString maskedPhone(QString phone) {
+    if (phone.size() >= 7) phone.replace(3, 4, "****");
+    return phone;
+}
+QString stationNumber(const QJsonArray &stations, const QString &id) {
+    for (int i = 0; i < stations.size(); ++i)
+        if (text(stations[i].toObject(), "id") == id)
+            return QString("ELECTRA-%1").arg(i + 1, 2, 10, QChar('0'));
+    return "ELECTRA-00";
+}
+QJsonObject localizedStationDetails(const QJsonObject &source, const QJsonArray &stations) {
+    auto result = source;
+    result["id"] = stationNumber(stations, text(source, "id"));
+    result.remove("source_station_id");
+    result.remove("zone_id");
+    result["address_verified"] = source.value("address_verified").toBool() ? "是" : "否";
+    QStringList periods;
+    for (const auto &value : source.value("tariff").toArray()) {
+        const auto item = value.toObject();
+        periods << QString("%1:00–%2:00，电费 %3 元/千瓦时，服务费 %4 元/千瓦时")
+                       .arg(text(item, "start_hour"), text(item, "end_hour"),
+                            text(item, "electricity_price"), text(item, "service_price"));
+    }
+    result["tariff"] = periods.isEmpty() ? "未单独设置，使用基础单价" : periods.join("；");
+    return result;
 }
 } // namespace
 AdminWindow::AdminWindow(ApiClient *a, CacheStore *c)
@@ -158,6 +208,17 @@ AdminWindow::AdminWindow(ApiClient *a, CacheStore *c)
     }
     nav->addWidget(navigation);
     nav->addStretch();
+    auto clock = label("", "color:#bba4c9;font-size:12px;padding:0 12px;");
+    clock->setAlignment(Qt::AlignCenter);
+    clock->setMinimumWidth(150);
+    const auto updateClock = [clock] {
+        clock->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd  HH:mm:ss"));
+    };
+    updateClock();
+    auto clockTimer = new QTimer(this);
+    connect(clockTimer, &QTimer::timeout, this, updateClock);
+    clockTimer->start(1000);
+    nav->addWidget(clock);
     auto refreshButton = button("", this, [this] {
         if (api->authenticated())
             refresh();
@@ -241,21 +302,35 @@ void AdminWindow::login() {
 void AdminWindow::manualLogin() {
     auto d = new QDialog(this);
     d->setAttribute(Qt::WA_DeleteOnClose);
+    d->setObjectName("admin-login-dialog");
     d->setWindowTitle("管理员登录");
+    d->resize(330, 330);
+    d->setMinimumSize(310, 310);
     auto l = new QVBoxLayout(d);
+    l->setContentsMargins(22, 22, 22, 22);
+    l->setSpacing(12);
     l->addWidget(dialogHeader(d, label("管理员登录", "font-size:22px;")));
     auto user = new QLineEdit;
+    user->setObjectName("admin-login-username");
     user->setPlaceholderText("管理员账号");
     auto pass = new QLineEdit;
+    pass->setObjectName("admin-login-password");
     pass->setPlaceholderText("密码");
     pass->setEchoMode(QLineEdit::Password);
     l->addWidget(user);
     l->addWidget(pass);
     auto err = label("");
+    err->setObjectName("admin-login-error");
     l->addWidget(err);
     l->addWidget(button(
         "登录", d,
         [=] {
+            // An untouched form is not an error state. Keep server-side and format errors for
+            // actual login attempts, but do not nag when the user clicks an empty form.
+            if (user->text().trimmed().isEmpty() && pass->text().isEmpty()) {
+                err->clear();
+                return;
+            }
             api->request("POST", "/auth/admin/login",
                          {{"username", user->text()}, {"password", pass->text()}}, d,
                          [=](const Reply &r) {
@@ -265,6 +340,7 @@ void AdminWindow::manualLogin() {
                              }
                              api->session(text(r.data.object(), "access_token"));
                              d->accept();
+                             navigate(current);
                              refresh();
                          });
         },
@@ -283,9 +359,9 @@ void AdminWindow::refresh() {
     auto failures = std::make_shared<QStringList>();
     QStringList paths = {"/admin/stations",
                          "/admin/chargers",
-                         "/admin/users?limit=200",
-                         QString("/admin/orders?limit=200&offset=%1").arg(offsetOrders),
-                         QString("/admin/ops-logs?limit=200&offset=%1").arg(offsetLogs),
+                         "/admin/users?limit=30",
+                         QString("/admin/orders?limit=30&offset=%1").arg(offsetOrders),
+                         QString("/admin/ops-logs?limit=30&offset=%1").arg(offsetLogs),
                          "/admin/stats/summary",
                          "/admin/console/settings",
                          "/admin/console/analytics"};
@@ -361,6 +437,12 @@ void AdminWindow::refresh() {
 }
 void AdminWindow::navigate(const QString &page) {
     current = page;
+    if (auto pageScroll=findChild<QScrollArea *>("page-scroll")) {
+        const bool fixedPage = page == "dashboard" || page == "trips" || page == "history";
+        pageScroll->setVerticalScrollBarPolicy(fixedPage ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAsNeeded);
+        pageScroll->verticalScrollBar()->setValue(0);
+        pageScroll->verticalScrollBar()->setEnabled(!fixedPage);
+    }
     for (auto b : root->findChildren<QPushButton *>())
         if (b->isCheckable())
             b->setChecked(b->objectName() == page);
@@ -390,12 +472,59 @@ void AdminWindow::dashboard() {
     auto fleetText = label(""); fleetText->setObjectName("fleet-summary");
     fleetText->setAlignment(Qt::AlignCenter); vehicleLayout->addWidget(fleetText);
     vehicleLayout->addWidget(label("已预约与充电设备 / 全部设备 · 插画表示设备占用率", "font-size:10px;color:#aa91bb;"));
-    auto goal = card("设备运行状态", &goalLayout);
-    auto gauge = new ArtWidget(ArtWidget::Gauge); gauge->setObjectName("device-gauge");
-    gauge->setFixedHeight(205); goalLayout->addWidget(gauge,1);
-    auto deviceText = label(""); deviceText->setObjectName("device-summary");
-    deviceText->setAlignment(Qt::AlignCenter); goalLayout->addWidget(deviceText);
-    goalLayout->addWidget(label("外弧：可用率    内弧：充电率 · 全部设备", "font-size:10px;color:#aa91bb;"));
+    auto goal = card("电桩状态总览", &goalLayout);
+    auto statusChart = baseChart("");
+    statusChart->legend()->hide();
+    auto statusSeries = new QPieSeries;
+    statusSeries->setHoleSize(.67);
+    statusSeries->setPieSize(.88);
+    const QStringList statusNames{"在用", "闲置", "故障"};
+    const QList<QColor> statusColors{QColor("#efb95d"), QColor("#ce7bda"), QColor("#9161cf")};
+    QList<QPieSlice *> statusSlices;
+    QList<QLabel *> statusCounts;
+    auto statusLegend = new QWidget;
+    auto statusKeys = new QVBoxLayout(statusLegend);
+    statusKeys->setContentsMargins(0, 0, 0, 0);
+    statusKeys->setSpacing(9);
+    statusKeys->addStretch();
+    for (int i = 0; i < statusNames.size(); ++i) {
+        auto slice = statusSeries->append(statusNames[i], 0);
+        slice->setBrush(statusColors[i]);
+        slice->setPen(Qt::NoPen);
+        statusSlices << slice;
+        auto group = new QVBoxLayout;
+        group->setSpacing(2);
+        auto line = new QHBoxLayout;
+        line->addWidget(label("●", QString("color:%1;").arg(statusColors[i].name())));
+        line->addWidget(label(statusNames[i], "font-size:11px;"));
+        auto count = label("0%", "font-size:12px;font-weight:600;color:#f0e5f7;");
+        count->setObjectName("device-status-" + QString::number(i));
+        count->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        line->addWidget(count, 1);
+        statusCounts << count;
+        group->addLayout(line);
+        auto amount = label("0 台", "font-size:9px;color:#947ca7;");
+        amount->setObjectName("device-status-count-" + QString::number(i));
+        group->addWidget(amount);
+        statusKeys->addLayout(group);
+    }
+    statusKeys->addStretch();
+    statusChart->addSeries(statusSeries);
+    auto statusView = view(statusChart, 190);
+    statusView->setObjectName("device-status-chart");
+    auto statusRing = new QWidget;
+    auto statusGrid = new QGridLayout(statusRing);
+    statusGrid->setContentsMargins(0, 0, 0, 0);
+    statusGrid->addWidget(statusView, 0, 0);
+    auto statusTotal = label("0\n总记录", "font-size:17px;font-weight:600;");
+    statusTotal->setObjectName("device-status-total");
+    statusTotal->setAlignment(Qt::AlignCenter);
+    statusTotal->setAttribute(Qt::WA_TransparentForMouseEvents);
+    statusGrid->addWidget(statusTotal, 0, 0, Qt::AlignCenter);
+    goalLayout->addWidget(row({statusRing, statusLegend}, {5, 3}), 1);
+    auto deviceHealth = label("设备健康度 0.00%", "font-size:10px;color:#aa91bb;");
+    deviceHealth->setObjectName("device-health");
+    goalLayout->addWidget(deviceHealth);
     auto mapCard = card("充电站地图", &m);
     auto map = new StationMap;
     map->setApi(api); map->setCompact(true); map->setFixedHeight(225);
@@ -406,7 +535,7 @@ void AdminWindow::dashboard() {
     auto explore = button("探索充电网络   →", this, [this] { navigate("station"); });
     explore->setProperty("quiet", true); m->addWidget(explore);
     auto top = row({vehicle,goal,mapCard}); top->setObjectName("dashboard-top");
-    top->setFixedHeight(340); body->addWidget(top);
+    top->setFixedHeight(355); body->addWidget(top);
     QVBoxLayout *stats, *list;
     auto s = card("充电营收统计", &stats);
     auto period = new QComboBox; period->addItem("近7天",7); period->addItem("近30天",30);
@@ -452,13 +581,19 @@ void AdminWindow::dashboard() {
     auto stationRows = new QVBoxLayout(stationHost);
     stationRows->setContentsMargins(0, 0, 0, 0);
     stationRows->setSpacing(9);
-    list->addWidget(stationHost);
+    auto stationScroll = new ContainedScrollArea;
+    stationScroll->setObjectName("dashboard-station-scroll");
+    stationScroll->setWidgetResizable(true);
+    stationScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    stationScroll->setFrameShape(QFrame::NoFrame);
+    stationScroll->setStyleSheet("QScrollArea{background:transparent;border:0;}"
+                                 "QScrollArea>QWidget>QWidget{background:transparent;}");
+    stationScroll->setWidget(stationHost);
+    list->addWidget(stationScroll, 1);
     auto renderStations = [=](int filterIndex) {
         clearLayout(stationRows);
         int count = 0;
         for (const auto &r : stations) {
-            if (count >= 4)
-                break;
             auto o = r.toObject();
             if (filterIndex == 1 && number(o, "available_count") <= 0)
                 continue;
@@ -518,21 +653,36 @@ void AdminWindow::dashboard() {
         if (!count)
             stationRows->addWidget(
                 emptyPanel("暂无空闲站点", "可切换全部站点查看设备状态", "plug"));
+        stationRows->addStretch();
+        stationScroll->verticalScrollBar()->setValue(0);
     };
     connect(filter, &QComboBox::activated, stationHost, renderStations);
     filter->setCurrentIndex(stationFilter);
     connect(filter,&QComboBox::activated,stationHost,[this](int i){stationFilter=i;});
-    list->addStretch();
     auto bottom = row({s, nearby}); bottom->setObjectName("dashboard-bottom");
-    bottom->setFixedHeight(390); body->addWidget(bottom);
+    bottom->setFixedHeight(420); body->addWidget(bottom);
     dashboardLoader = [=] {
-        const double total=chargers.size(); int available=0, charging=0, reserved=0;
-        for (auto v:chargers) {const auto state=text(v.toObject(),"status"); available+=state=="available";charging+=state=="charging";reserved+=state=="reserved";}
+        const int total=chargers.size(); int available=0, charging=0, reserved=0, faulted=0;
+        for (auto v:chargers) {
+            const auto state=text(v.toObject(),"status");
+            available+=state=="available";
+            charging+=state=="charging";
+            reserved+=state=="reserved";
+            faulted+=state=="faulted";
+        }
+        const QList<int> statusValues{charging + reserved, available,
+                                      faulted + qMax(0, total - available - charging - reserved - faulted)};
+        for (int i = 0; i < statusValues.size(); ++i) {
+            statusSlices[i]->setValue(statusValues[i]);
+            const double percent = total ? statusValues[i] * 100.0 / total : 0;
+            statusCounts[i]->setText(QString("%1%").arg(percent, 0, 'f', 1));
+            goal->findChild<QLabel *>("device-status-count-" + QString::number(i))
+                ->setText(QString("%1 台").arg(statusValues[i]));
+        }
+        statusTotal->setText(QString("%1\n总记录").arg(total));
+        deviceHealth->setText(QString("设备健康度 %1%").arg(total ? (total - statusValues[2]) * 100.0 / total : 0, 0, 'f', 2));
         car->setValue(total ? (charging+reserved)*100./total : -1,"设备占用率");
-        gauge->setValue(total ? available*100./total : -1,"设备可用率");
-        gauge->setValues({total ? charging*100./total : 0});
         fleetText->setText(QString("%1 个站点       %2 台设备       %3 台占用").arg(stations.size()).arg(int(total)).arg(charging+reserved));
-        deviceText->setText(total ? QString("%1% 可用       %2% 充电中").arg(money(available*100./total),money(charging*100./total)) : "暂无设备数据");
         revenueSummary->setText(QString("今日 ¥%1    本月 ¥%2    总营收 ¥%3").arg(money(number(summary,"today_revenue")),money(number(summary,"month_revenue")),money(number(summary,"total_revenue"))));
         map->setStations(stations,selectedStation); renderStations(filter->currentIndex()); loadRevenue();
     };
@@ -616,12 +766,17 @@ void AdminWindow::ordersPage() {
     QVBoxLayout *journey;
     auto journeyCard = card("所选订单", &journey);
     auto art = new DataGraphic(DataGraphic::Journey);
-    art->setFixedHeight(205);
+    art->setFixedHeight(150);
     art->setObjectName("order-progress");
     art->setJourney(recent);
     journey->addWidget(art);
     if (!recent.isEmpty()) {
-        auto detail=button("查看该订单", this, [=] { showDetail(this,"订单详情",recent); });
+        auto detail=button("查看该订单", this, [=] {
+            auto details=recent;
+            details["station_id"]=stationNumber(stations,text(details,"station_id"));
+            details["user_id"]=userNumber(details);
+            showDetail(this,"订单详情",details);
+        });
         detail->setObjectName("selected-order-detail");
         journey->addWidget(detail);
     }
@@ -638,7 +793,7 @@ void AdminWindow::ordersPage() {
     trend->addWidget(row({valueBlock(money(energy), "kWh", "当前页电量"),
                           valueBlock(QString::number(orders.size()), "笔", "订单数量")}));
     auto overview=row({journeyCard, donut(counts, "订单状态分布"), trendCard}, {12, 10, 11});
-    overview->setFixedHeight(410);
+    overview->setFixedHeight(345);
     body->addWidget(overview);
     auto search = new QLineEdit(orderSearch);
     search->setPlaceholderText("搜索站点、手机号、订单编号，回车查询");
@@ -659,15 +814,16 @@ void AdminWindow::ordersPage() {
     QVBoxLayout *list;
     auto box = card("最近充电订单", &list);
     list->itemAt(0)->layout()->addWidget(
-        button("＋ 新建订单", this, [this] { manager("orders"); }, true));
+        button("订单管理", this, [this] { manager("orders"); }, true));
     auto tableHost = new QWidget;
     auto records = new QVBoxLayout(tableHost);
     records->setContentsMargins(0, 0, 0, 0);
     records->setSpacing(0);
-    auto tableScroll = new QScrollArea;
+    auto tableScroll = new ContainedScrollArea;
     tableScroll->setWidgetResizable(true);
     tableScroll->setWidget(tableHost);
-    tableScroll->setMinimumHeight(340);
+    tableScroll->setFixedHeight(300);
+    tableScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     list->addWidget(tableScroll);
     records->addWidget(
         row({label("站点 / 用户", "color:#9780a8;"), label("状态", "color:#9780a8;"),
@@ -682,7 +838,7 @@ void AdminWindow::ordersPage() {
             continue;
         ++count;
         auto info = label(text(o, "station_name") + "   ·   " + text(o, "charger_code") + "\n" +
-                              text(o, "phone") + "   " + localDateTime(text(o, "reserved_at")),
+                              maskedPhone(text(o, "phone")) + "   " + text(o, "reserved_at"),
                           "font-size:13px;");
         auto status = label(statusText(text(o, "status")), "color:#c992e1;");
         auto cost = label(money(number(o, "energy_kwh")) + " kWh\n¥" + money(number(o, "amount")));
@@ -692,8 +848,12 @@ void AdminWindow::ordersPage() {
             selectedOrder=text(o,"id");
             navigate("trips");
             api->get("/admin/orders/" + text(o, "id"), this, [=](const Reply &r) {
-                if (r.ok)
-                    showDetail(this, "订单详情", r.data.object());
+                if (r.ok) {
+                    auto details=r.data.object();
+                    details["station_id"]=stationNumber(stations,text(details,"station_id"));
+                    details["user_id"]=userNumber(details);
+                    showDetail(this, "订单详情", details);
+                }
                 else
                     message(r);
             });
@@ -725,13 +885,16 @@ void AdminWindow::ordersPage() {
     }
     if (!count)
         records->addWidget(emptyPanel("没有匹配的充电订单", "可调整状态筛选或搜索条件", "car"));
+    tableHost->setMinimumHeight(qMax(300, 48 + count * 88));
     records->addStretch();
     QVBoxLayout *summaryLayout, *equipment;
     auto summaryCard = card("订单概览", &summaryLayout);
+    summaryCard->setFixedHeight(180);
     summaryLayout->addWidget(detailLine("car", "当前页订单", QString::number(orders.size()) + " 笔"));
     summaryLayout->addWidget(detailLine("bolt", "当前页电量", money(energy) + " kWh"));
     summaryLayout->addWidget(detailLine("chart", "订单金额", "¥" + money(amount)));
     auto equipmentCard = card("设备状态", &equipment);
+    equipmentCard->setFixedHeight(190);
     QMap<QString, double> devices;
     for (auto v : chargers)
         devices[statusText(text(v.toObject(), "status"))]++;
@@ -745,27 +908,16 @@ void AdminWindow::ordersPage() {
     asideLayout->setContentsMargins(0, 0, 0, 0);
     asideLayout->addWidget(summaryCard);
     asideLayout->addWidget(equipmentCard);
-    asideLayout->addStretch();
-    body->addWidget(row({box, aside}, {3, 1}));
-    body->addWidget(row({button("上一页", this,
-                                [this] {
-                                    offsetOrders = qMax(0, offsetOrders - 200);
-                                    refresh();
-                                }),
-                         label(QString("偏移 %1 · %2 条记录").arg(offsetOrders).arg(orders.size())),
-                         button("下一页", this, [this] {
-                             if (orders.size() == 200) {
-                                 offsetOrders += 200;
-                                 refresh();
-                             }
-                         })}));
+    auto orderArea = row({box, aside}, {3, 1});
+    orderArea->setFixedHeight(380);
+    body->addWidget(orderArea);
 }
 void AdminWindow::auditPage() {
     QMap<QString, double> counts, days;
     QList<QList<double>> activity(7, QList<double>(24, 0));
     QSet<QString> operators;
     int moneyEvents = 0;
-    const QMap<QString, QString> types = {{"order", "充电订单"},   {"wallet", "钱包资金"},
+    const QMap<QString, QString> types = {{"order", "充电订单"},   {"wallet", "钱包资金"}, {"withdrawal", "提现审核"},
                                           {"charger", "电桩设备"}, {"station", "站点"},
                                           {"user", "用户"},        {"console", "系统设置"}};
     for (auto v : logs) {
@@ -804,10 +956,11 @@ void AdminWindow::auditPage() {
     auto list = new QVBoxLayout(content);
     list->setContentsMargins(0, 0, 0, 0);
     list->setSpacing(8);
-    auto scroll = new QScrollArea;
+    auto scroll = new ContainedScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setWidget(content);
-    scroll->setMinimumHeight(590);
+    scroll->setFixedHeight(485);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     timeline->addWidget(scroll);
     QVBoxLayout *selectedLayout;
     auto selectedCard = card("事件详情", &selectedLayout);
@@ -851,22 +1004,49 @@ void AdminWindow::auditPage() {
             textcol->setSpacing(5);
             textcol->addWidget(label(actionLabel(action), "font-size:14px;font-weight:600;"));
             textcol->addWidget(
-                label(types.value(action.section('.', 0, 0), action.section('.', 0, 0)) + " · " +
-                          text(o, "target_id").left(18),
+                label(types.value(action.section('.', 0, 0), "其他操作"),
                       "font-size:10px;color:#a88eba;"));
             r->addLayout(textcol, 1);
             r->addWidget(label(localTime.time().toString("HH:mm:ss"), "color:#a88eba;font-size:11px;"));
             r->addWidget(button("查看 ↗", content, [=] {
-                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + localDateTime(text(o, "created_at")) +
+                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + text(o, "created_at") +
                                        "\n\n对象  " + text(o, "target_type") + "\n" +
                                        text(o, "target_id"));
-                showDetail(this, "审计事件", o);
+                QJsonObject details{{"操作编号",text(o,"id")}, {"操作名称",actionLabel(action)},
+                                    {"操作时间",text(o,"created_at")},
+                                    {"操作账号",text(o,"username")},
+                                    {"对象类型",types.value(text(o,"target_type"),"其他对象")}};
+                QString target=text(o,"target_id");
+                if(text(o,"target_type")=="station")target=stationNumber(stations,target);
+                if(text(o,"target_type")=="charger")for(auto v:chargers)if(text(v.toObject(),"id")==target){target=text(v.toObject(),"code");break;}
+                details["操作对象"]=target.isEmpty()?"无":target;
+                QJsonObject readable;
+                QJsonObject raw;
+                if (o.value("detail").isObject())
+                    raw = o.value("detail").toObject();
+                else if (o.value("detail").isString())
+                    raw = QJsonDocument::fromJson(text(o, "detail").toUtf8()).object();
+                for(auto it=raw.begin();it!=raw.end();++it){
+                    const QString key=QMap<QString,QString>{{"from","原状态"},{"to","新状态"},{"amount","金额"},{"reason","原因"},{"note","说明"},{"status","状态"},{"kind","类型"},{"power_kw","功率 kW"},{"nickname","昵称"},{"phone","手机号"}}.value(it.key(),it.key());
+                    readable[key]=it.value().isString()?QJsonValue(statusText(it.value().toString())):it.value();
+                }
+                QString operation = actionLabel(action);
+                if (raw.contains("from") || raw.contains("to"))
+                    operation += QString("：%1 → %2")
+                                     .arg(statusText(text(raw, "from", "未记录")),
+                                          statusText(text(raw, "to", "未记录")));
+                else if (raw.contains("amount"))
+                    operation += QString("：%1 元").arg(text(raw, "amount"));
+                details["具体操作"] = operation;
+                if(!readable.isEmpty())details["变更内容"]=readable;
+                showDetail(this, "审计事件", details);
             }));
             list->addWidget(item);
         }
         if (!count)
             list->addWidget(emptyPanel("暂无匹配事件", "更换事件类型或搜索词"));
         list->addStretch();
+        content->setMinimumHeight(qMax(485, count * 82 + 55));
     };
     connect(filter, &QComboBox::activated, content, [=](int) { render(); });
     connect(search, &QLineEdit::textChanged, content, [=](const QString &) { render(); });
@@ -874,13 +1054,16 @@ void AdminWindow::auditPage() {
     auto side = new QWidget;
     auto sideLayout = new QVBoxLayout(side);
     sideLayout->setContentsMargins(0, 0, 0, 0);
-    sideLayout->addWidget(donut(counts, "操作类型分布"));
+    auto distributionCard = donut(counts, "操作类型分布");
+    distributionCard->setFixedHeight(345);
+    sideLayout->addWidget(distributionCard);
     QVBoxLayout *heat;
     auto heatCard = card("操作活跃度 · 北京时间", &heat);
     auto grid = new DataGraphic(DataGraphic::Heatmap);
     grid->setData(activity);
     heat->addWidget(grid);
     heat->addWidget(label("星期 × 小时 · 当前页事件数", "font-size:10px;color:#a489b9;"));
+    heatCard->setFixedHeight(230);
     sideLayout->addWidget(heatCard);
     QVBoxLayout *trend;
     auto trendCard = card("操作趋势", &trend);
@@ -891,21 +1074,25 @@ void AdminWindow::auditPage() {
         dates << d.mid(5);
     chart->setData({days.values()}, dates, "次");
     trend->addWidget(chart);
-    sideLayout->addWidget(trendCard);
-    sideLayout->addWidget(selectedCard);
-    body->addWidget(row({timelineCard, side}, {3, 2}));
-    body->addWidget(row({button("上一页", this,
+    trendCard->hide();
+    selectedCard->hide();
+    auto auditArea = row({timelineCard, side}, {7, 4});
+    auditArea->setFixedHeight(590);
+    body->addWidget(auditArea);
+    /* Pagination removed: the operation timeline scrolls internally. */
+    auto paging = row({button("上一页", this,
                                 [this] {
-                                    offsetLogs = qMax(0, offsetLogs - 200);
+                                    offsetLogs = qMax(0, offsetLogs - 30);
                                     refresh();
                                 }),
-                         label(QString("偏移 %1 · 每页最多 200 条").arg(offsetLogs)),
+                         label(QString("第 %1 页 · 每页最多 30 条").arg(offsetLogs / 30 + 1)),
                          button("下一页", this, [this] {
-                             if (logs.size() == 200) {
-                                 offsetLogs += 200;
+                             if (logs.size() == 30) {
+                                 offsetLogs += 30;
                                  refresh();
                              }
-                         })}));
+                         })});
+    paging->hide();
 }
 void AdminWindow::forecastPage() {
     body->addWidget(label("ENERGY INTELLIGENCE / 历史实验",
@@ -944,34 +1131,63 @@ void AdminWindow::forecastPage() {
             {label("历史实验 · 非实时   数据截止 " + text(d, "cutoff"), "color:#e3b0df;"), select},
             {3, 1}));
         auto history = d.value("history").toArray(), pred = d.value("prediction").toArray();
+        const auto historyDates = d.value("history_dates").toArray();
+        const auto futureDates = d.value("future_dates").toArray();
         double total = 0, peak = 0;
-        for (auto v : pred) {
+        int peakIndex = 0;
+        for (int i = 0; i < pred.size(); ++i) {
+            const auto v = pred[i];
             total += v.toDouble();
-            peak = qMax(peak, v.toDouble());
+            if (v.toDouble() > peak) {
+                peak = v.toDouble();
+                peakIndex = i;
+            }
         }
+        const auto peakTime = QDateTime::fromString(futureDates[peakIndex].toString(), Qt::ISODate);
         layout->addWidget(
             row({metricCard("未来 24 小时电量", money(total) + " kWh", text(d, "label")),
-                 metricCard("预测小时峰值", money(peak), "kWh / 小时 · 历史估算口径"),
+                 metricCard("预测小时峰值", money(peak) + " kWh",
+                            peakTime.toString("MM-dd HH:mm") + " · 该小时预测电量"),
                  metricCard("已选用模型", text(d, "model"),
                             QString("经验范围测试覆盖率 %1%").arg(number(d, "test_coverage")))}));
         QVBoxLayout *chartLayout;
         auto box = card("充电需求趋势 · 最近48小时与未来24小时", &chartLayout);
-        auto chart = baseChart("小时电量 kWh；横轴 48 为预测开始");
+        auto chart = baseChart("横轴：日期与小时　　纵轴：每小时充电电量（kWh）");
         auto a = new QLineSeries;
         a->setName("历史");
         auto b = new QLineSeries;
         b->setName("预测");
         auto lo = new QLineSeries;
         auto hi = new QLineSeries;
+        auto timeAt = [](const QJsonArray &dates, int index) {
+            return QDateTime::fromString(dates[index].toString(), Qt::ISODate).toMSecsSinceEpoch();
+        };
         for (int i = 0; i < history.size(); i++)
-            a->append(i, history[i].toDouble());
+            a->append(timeAt(historyDates, i), history[i].toDouble());
         for (int i = 0; i < pred.size(); i++) {
-            b->append(i + 48, pred[i].toDouble());
-            lo->append(i + 48, d.value("lower").toArray()[i].toDouble());
-            hi->append(i + 48, d.value("upper").toArray()[i].toDouble());
+            const auto moment = timeAt(futureDates, i);
+            b->append(moment, pred[i].toDouble());
+            lo->append(moment, d.value("lower").toArray()[i].toDouble());
+            hi->append(moment, d.value("upper").toArray()[i].toDouble());
         }
         a->setPen(QPen(QColor("#dc98e4"), 2.5));
         b->setPen(QPen(QColor("#85dfcf"), 3));
+        auto showPoint = [host](const QString &kind, const QPointF &point, bool state) {
+            if (!state) {
+                QToolTip::hideText();
+                return;
+            }
+            const auto moment = QDateTime::fromMSecsSinceEpoch(qRound64(point.x()));
+            QToolTip::showText(
+                QCursor::pos(),
+                QString("%1\n%2\n%3 kWh").arg(kind, moment.toString("yyyy-MM-dd HH:mm"),
+                                                QString::number(point.y(), 'f', 2)),
+                host);
+        };
+        connect(a, &QLineSeries::hovered, host,
+                [showPoint](const QPointF &point, bool state) { showPoint("历史电量", point, state); });
+        connect(b, &QLineSeries::hovered, host,
+                [showPoint](const QPointF &point, bool state) { showPoint("预测电量", point, state); });
         auto band = new QAreaSeries(hi, lo);
         band->setName("经验误差范围");
         band->setBrush(QColor("#554f2769"));
@@ -979,19 +1195,57 @@ void AdminWindow::forecastPage() {
         chart->addSeries(band);
         chart->addSeries(a);
         chart->addSeries(b);
-        chart->createDefaultAxes();
+        auto xAxis = new QDateTimeAxis;
+        xAxis->setFormat("MM-dd\nHH:mm");
+        xAxis->setTickCount(7);
+        xAxis->setTitleText("过去48小时　　　　　　　　　│ 预测开始 │　　　　　　　　　未来24小时");
+        xAxis->setRange(QDateTime::fromString(historyDates.first().toString(), Qt::ISODate),
+                        QDateTime::fromString(futureDates.last().toString(), Qt::ISODate));
+        auto yAxis = new QValueAxis;
+        yAxis->setTitleText("每小时充电电量（kWh）");
+        double yMin = std::numeric_limits<double>::max(), yMax = 0;
+        for (const auto &point : a->points()) {
+            yMin = qMin(yMin, point.y());
+            yMax = qMax(yMax, point.y());
+        }
+        for (const auto &series : QList<QLineSeries *>{lo, hi})
+            for (const auto &point : series->points()) {
+                yMin = qMin(yMin, point.y());
+                yMax = qMax(yMax, point.y());
+            }
+        yAxis->setRange(qMax(0.0, yMin), yMax);
+        chart->addAxis(xAxis, Qt::AlignBottom);
+        chart->addAxis(yAxis, Qt::AlignLeft);
+        for (auto series : QList<QAbstractSeries *>{band, a, b}) {
+            series->attachAxis(xAxis);
+            series->attachAxis(yAxis);
+        }
+        yAxis->applyNiceNumbers();
         for (auto axis : chart->axes()) {
             axis->setLabelsColor(QColor("#b6a0c6"));
+            axis->setTitleBrush(QColor("#bba4c9"));
             axis->setGridLineColor(QColor("#352342"));
         }
         chartLayout->addWidget(view(chart, 340));
         layout->addWidget(box);
+        layout->addWidget(label("三种预测方法对比 · WAPE、MAE 均为越低越好",
+                                "font-size:15px;font-weight:600;color:#e6d6ed;"));
         QList<QWidget *> metrics;
+        double bestWape = std::numeric_limits<double>::max();
+        for (const auto &v : d.value("metrics").toArray())
+            bestWape = qMin(bestWape, number(v.toObject(), "wape"));
         for (const auto &v : d.value("metrics").toArray()) {
             auto m = v.toObject();
+            const bool selected = m.value("selected").toBool();
+            const bool lowest = qFuzzyCompare(number(m, "wape") + 1, bestWape + 1);
+            QString caption = text(m, "model");
+            if (selected)
+                caption += " · 本次采用";
+            else if (lowest)
+                caption += " · 区域平均误差最低";
             metrics << metricCard(
-                text(m, "model"), QString::number(number(m, "wape"), 'f', 3) + "% WAPE",
-                QString("测试 MAE %1 · 验证 MAE %2")
+                caption, QString::number(number(m, "wape"), 'f', 3) + "% WAPE",
+                QString("每小时测试平均误差 %1 kWh · 验证误差 %2 kWh")
                     .arg(money(number(m, "mae")), money(number(m, "validation_mae"))));
         }
         layout->addWidget(row(metrics));
@@ -1000,11 +1254,26 @@ void AdminWindow::forecastPage() {
     });
 }
 void AdminWindow::settings() {
-    showDetail(this, "平台运营信息", summary);
+    QJsonObject overview;
+    const QMap<QString, QString> names{{"stations", "充电站数量"},
+                                       {"chargers", "电桩总数"},
+                                       {"available", "可用电桩"},
+                                       {"charging", "充电中电桩"},
+                                       {"faulted", "故障电桩"},
+                                       {"users", "用户数量"},
+                                       {"today_orders", "今日完成订单"},
+                                       {"completed_orders", "累计完成订单"},
+                                       {"today_revenue", "今日营收（元）"},
+                                       {"month_revenue", "本月营收（元）"},
+                                       {"total_revenue", "累计营收（元）"}};
+    for (auto it = names.begin(); it != names.end(); ++it)
+        if (summary.contains(it.key()))
+            overview[it.value()] = summary.value(it.key());
+    showDetail(this, "平台概况", overview);
 }
 void AdminWindow::withdrawalsPage() {
     if(!api->authenticated()){manualLogin();return;}
-    auto d=new QDialog(this);d->setAttribute(Qt::WA_DeleteOnClose);d->resize(980,560);
+    auto d=new QDialog(this);d->setAttribute(Qt::WA_DeleteOnClose);d->resize(1100,650);
     auto l=new QVBoxLayout(d);l->addWidget(dialogHeader(d,label("提现审核 · 演示到账")));
     auto filter=new QComboBox;filter->addItem("待审核","pending");filter->addItem("模拟已到账","paid");filter->addItem("已驳回","rejected");l->addWidget(filter);
     auto table=new QTableWidget;l->addWidget(table);table->setSelectionBehavior(QAbstractItemView::SelectRows);table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -1015,7 +1284,13 @@ void AdminWindow::withdrawalsPage() {
         QStringList keys={"phone","nickname","amount","destination","status","requested_at","review_note"};
         table->setColumnCount(keys.size());table->setHorizontalHeaderLabels({"手机号","昵称","金额","演示收款账户","状态","申请时间","审核意见"});table->setRowCount(items->size());
         for(int i=0;i<items->size();++i)for(int j=0;j<keys.size();++j)table->setItem(i,j,new QTableWidgetItem(statusText(text((*items)[i].toObject(),keys[j]))));
-        table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+        auto header=table->horizontalHeader();
+        header->setStretchLastSection(false);
+        const QList<int> widths={135,120,90,180,100,220,180};
+        for(int column=0;column<widths.size();++column){
+            header->setSectionResizeMode(column,column==widths.size()-1?QHeaderView::Stretch:QHeaderView::Fixed);
+            if(column+1<widths.size())table->setColumnWidth(column,widths[column]);
+        }
     });};
     connect(d,&QDialog::finished,this,[load]{*load={};});
     connect(filter,&QComboBox::activated,d,[=](int){if(*load)(*load)();});
@@ -1052,28 +1327,33 @@ void AdminWindow::manager(const QString &kind) {
         manualLogin();
         return;
     }
+    const QString managerName = QMap<QString, QString>{{"users", "用户数据管理"},
+                                                       {"stations", "充电站管理"},
+                                                       {"chargers", "电桩设备管理"},
+                                                       {"orders", "充电订单管理"}}
+                                    .value(kind, "运营数据管理");
     auto d = new QDialog(this);
     d->setAttribute(Qt::WA_DeleteOnClose);
-    d->setWindowTitle("运营数据管理");
-    d->resize(1100, 650);
+    d->setWindowTitle(managerName);
+    d->resize(kind == "users" ? 1200 : 1100, 650);
     auto layout = new QVBoxLayout(d);
-    auto title = label("数据管理 · " + QMap<QString, QString>{{"users", "用户"},
-                                                              {"stations", "站点"},
-                                                              {"chargers", "电桩"},
-                                                              {"orders", "订单"}}
-                                           .value(kind),
-                       "font-size:23px;");
+    auto title = label(managerName + " · 第 1 页", "font-size:23px;");
     layout->addWidget(dialogHeader(d, title));
     auto search = new QLineEdit;
-    search->setPlaceholderText("筛选当前页：站点、编号、手机号或状态");
+    search->setPlaceholderText(QMap<QString, QString>{{"users", "筛选当前页：用户编号、昵称、手机号或状态"},
+        {"stations", "筛选当前页：站点编号、名称、地址"},
+        {"chargers", "筛选当前页：站点、电桩编号、类型或状态"},
+        {"orders", "筛选当前页：站点、电桩、手机号或状态"}}.value(kind));
     layout->addWidget(search);
     auto stationFilter=new QComboBox;stationFilter->addItem("全部站点","");
     for(auto v:stations){auto o=v.toObject();stationFilter->addItem(text(o,"name"),text(o,"id"));}
     auto stateFilter=new QComboBox;stateFilter->addItem("全部状态","");
     for(auto state:QStringList{"available","reserved","charging","faulted"})stateFilter->addItem(statusText(state),state);
     auto typeFilter=new QComboBox;typeFilter->addItem("全部类型","");typeFilter->addItem("快充","fast");typeFilter->addItem("慢充","slow");
-    auto minimumPower=new QDoubleSpinBox;minimumPower->setRange(0,1000);minimumPower->setPrefix("最低功率 ");minimumPower->setSuffix(" kW");
-    auto maximumPower=new QDoubleSpinBox;maximumPower->setRange(0,1000);maximumPower->setValue(1000);maximumPower->setPrefix("最高功率 ");maximumPower->setSuffix(" kW");
+    auto minimumPower=new QDoubleSpinBox;minimumPower->setRange(0,1000);minimumPower->setPrefix("额定功率下限 ");minimumPower->setSuffix(" kW");
+    auto maximumPower=new QDoubleSpinBox;maximumPower->setRange(0,1000);maximumPower->setValue(1000);maximumPower->setPrefix("额定功率上限 ");maximumPower->setSuffix(" kW");
+    minimumPower->setToolTip("仅显示额定输出功率不低于此值的电桩");
+    maximumPower->setToolTip("仅显示额定输出功率不高于此值的电桩");
     auto filterRow=row({stationFilter,stateFilter,typeFilter,minimumPower,maximumPower});filterRow->setVisible(kind=="chargers");layout->addWidget(filterRow);
     auto table = new QTableWidget;
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -1112,20 +1392,26 @@ void AdminWindow::manager(const QString &kind) {
     *load = [=] {
         QString path = "/admin/" + kind;
         if (kind == "users" || kind == "orders")
-            path += QString("?limit=200&offset=%1").arg(*offset);
+            path += QString("?limit=12&offset=%1").arg(*offset);
         api->get(path, d, [=](const Reply &r) {
             if (!r.ok) {
                 QMessageBox::warning(d, "读取失败", r.error);
                 return;
             }
-            *items = r.data.array();
+            const auto allItems = r.data.array();
+            if (kind == "stations" || kind == "chargers") {
+                *items = QJsonArray{};
+                for (int i = *offset; i < qMin(*offset + 12, allItems.size()); ++i)
+                    items->append(allItems[i]);
+            } else
+                *items = allItems;
             QStringList columns =
                 kind == "users"      ? QStringList{"id", "nickname", "phone", "balance", "status", "created_at"}
                 : kind == "stations" ? QStringList{"id", "name", "address", "longitude", "latitude", "unit_price", "charger_count", "online_rate"}
                 : kind == "chargers"
                     ? QStringList{"station_name", "code", "kind", "power_kw", "status", "total_sessions", "total_minutes"}
                     : QStringList{"station_name", "charger_code", "phone", "status", "amount"};
-            QMap<QString, QString> names = {{"id", "编号"}, {"created_at", "注册时间"}, {"longitude", "经度"}, {"latitude", "纬度"}, {"online_rate", "在线率 %"}, {"total_sessions", "累计次数"}, {"total_minutes", "累计分钟"}, {"nickname", "昵称"},     {"phone", "手机号"},
+            QMap<QString, QString> names = {{"id", kind == "users" ? "用户编号" : kind == "stations" ? "站点编号" : "记录编号"}, {"created_at", "注册时间"}, {"longitude", "经度"}, {"latitude", "纬度"}, {"online_rate", "在线率 %"}, {"total_sessions", "累计次数"}, {"total_minutes", "累计分钟"}, {"nickname", "昵称"},     {"phone", "手机号"},
                                             {"balance", "余额"},      {"status", "状态"},
                                             {"name", "站点"},         {"address", "地址"},
                                             {"unit_price", "单价"},   {"charger_count", "电桩数"},
@@ -1140,15 +1426,43 @@ void AdminWindow::manager(const QString &kind) {
             table->setRowCount(items->size());
             for (int i = 0; i < items->size(); i++)
                 for (int j = 0; j < columns.size(); j++)
-                    table->setItem(
+            table->setItem(
                         i, j,
-                        new QTableWidgetItem(columns[j].endsWith("_at")
-                            ? localDateTime(text((*items)[i].toObject(), columns[j]))
+                        new QTableWidgetItem(kind == "users" && columns[j] == "id"
+                            ? userNumber((*items)[i].toObject())
+                            : kind == "users" && columns[j] == "phone"
+                                ? maskedPhone(text((*items)[i].toObject(), "phone"))
+                            : kind == "stations" && columns[j] == "id"
+                                ? stationNumber(stations, text((*items)[i].toObject(), "id"))
                             : statusText(text((*items)[i].toObject(), columns[j]))));
-            table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-            table->horizontalHeader()->setStretchLastSection(true);applyFilters();
-            title->setText(
-                QString("运营数据管理 · %1 条 · 第 %2 页").arg(items->size()).arg(*offset / 200 + 1));
+            auto header = table->horizontalHeader();
+            header->setStretchLastSection(false);
+            for (int j = 0; j < columns.size(); ++j)
+                header->setSectionResizeMode(j, j == columns.size() - 1
+                                                   ? QHeaderView::Stretch
+                                                   : QHeaderView::Fixed);
+            const QMap<QString, int> widths{{"id", 130}, {"nickname", 120}, {"phone", 135},
+                {"balance", 90}, {"status", 90}, {"name", 155}, {"address", 220},
+                {"longitude", 115}, {"latitude", 115}, {"unit_price", 100},
+                {"charger_count", 90}, {"station_name", 170}, {"code", 150},
+                {"kind", 90}, {"power_kw", 100}, {"total_sessions", 100},
+                {"total_minutes", 110}, {"charger_code", 145}, {"amount", 100}};
+            for (int j = 0; j + 1 < columns.size(); ++j)
+                table->setColumnWidth(j, widths.value(columns[j], 125));
+            if (kind == "users") {
+                // User identifiers have a fixed display length. Keep the business columns in
+                // their existing relative proportions and reserve only enough room for the
+                // complete ISO registration timestamp.
+                const QList<int> userWidths{145, 185, 185, 120, 110, 360};
+                for (int j = 0; j < userWidths.size(); ++j) {
+                    header->setSectionResizeMode(j, QHeaderView::Fixed);
+                    table->setColumnWidth(j, userWidths[j]);
+                }
+            } else if (kind == "chargers" || kind == "orders")
+                for (int j = 0; j < columns.size(); ++j)
+                    header->setSectionResizeMode(j, QHeaderView::Stretch);
+            applyFilters();
+            title->setText(QString("%1 · 第 %2 页").arg(managerName).arg(*offset / 12 + 1));
         });
     };
     connect(table,&QTableWidget::cellClicked,d,[=](int,int){
@@ -1166,11 +1480,22 @@ void AdminWindow::manager(const QString &kind) {
     });
     connect(table, &QTableWidget::cellDoubleClicked, d, [=](int, int) {
         auto o = selection(); if (o.isEmpty()) return;
-        if (kind == "users" || kind == "stations") {
-            const auto path = kind == "users" ? "/admin/users/" + text(o,"id") + "/wallet"
-                : "/public/stations/" + text(o,"id") + "/chargers";
+        if (kind == "users") {
+            const auto path = "/admin/users/" + text(o,"id") + "/wallet";
             api->get(path, d, [=](const Reply &r) {
-                if (r.ok) showDetail(d, kind == "users" ? "用户钱包流水" : "站点电桩状态", {{"记录", r.data.array()}});
+                if (r.ok) {
+                    auto rows = r.data.array();
+                    for (int i = 0; i < rows.size(); ++i) {
+                        auto item = rows[i].toObject();
+                        item.remove("user_id");
+                        if (text(item, "order_id").isEmpty() && text(item, "entry_type") == "recharge")
+                            item["order_id"] = "无（钱包充值）";
+                        rows[i] = item;
+                    }
+                    showDetail(d, "用户钱包流水",
+                               {{"当前用户", text(o,"nickname") + "（" + userNumber(o) + "）"},
+                                {"记录", rows}});
+                }
                 else message(r);
             });
         } else showDetail(d, "记录详情", o);
@@ -1182,7 +1507,7 @@ void AdminWindow::manager(const QString &kind) {
             (*load)();
         refresh();
     };
-    tools->addWidget(button(
+    auto addButton = button(
         "新增", d,
         [=] {
             QList<QPair<QString, QString>> fields;
@@ -1190,17 +1515,29 @@ void AdminWindow::manager(const QString &kind) {
             if (kind == "users")
                 fields = {{"phone", "手机号"}, {"nickname", "昵称"}};
             if (kind == "stations") {
-                fields = {{"name", "站点名称"},
-                          {"address", "地址"},
-                          {"longitude", "经度"},
-                          {"latitude", "纬度"},
-                          {"unit_price", "单价 元/kWh"}, {"initial_chargers", "初始电桩数量（0–100）"}};
-                values = {{"longitude", "114.05"}, {"latitude", "22.55"}, {"unit_price", "1.20"}, {"initial_chargers", 0}};
+                auto form=new QDialog(d);form->setAttribute(Qt::WA_DeleteOnClose);form->resize(500,650);
+                auto rows=new QVBoxLayout(form);rows->addWidget(dialogHeader(form,label("新增站点","font-size:22px;")));
+                auto name=new QLineEdit;auto address=new QLineEdit;
+                auto longitude=new QDoubleSpinBox;longitude->setRange(-180,180);longitude->setDecimals(6);longitude->setValue(114.05);
+                auto latitude=new QDoubleSpinBox;latitude->setRange(-90,90);latitude->setDecimals(6);latitude->setValue(22.55);
+                auto price=new QDoubleSpinBox;price->setRange(.01,9999);price->setDecimals(2);price->setValue(1.20);price->setSuffix(" 元/kWh");
+                auto quantity=new QSpinBox;quantity->setRange(0,100);
+                auto type=new QComboBox;type->addItem("快充","fast");type->addItem("慢充","slow");
+                auto power=new QDoubleSpinBox;power->setDecimals(1);power->setSuffix(" kW");
+                auto adjustPower=[=]{bool fast=type->currentData()=="fast";power->setRange(fast?20:3.5,fast?240:14);power->setValue(fast?60:7);};adjustPower();
+                connect(type,&QComboBox::activated,form,[=](int){adjustPower();});
+                for(auto pair:QList<QPair<QString,QWidget*>>{{"站点名称",name},{"地址",address},{"经度",longitude},{"纬度",latitude},{"单价",price},{"初始电桩数量",quantity},{"初始电桩类型",type},{"初始电桩额定功率",power}}){rows->addWidget(label(pair.first));rows->addWidget(pair.second);}
+                rows->addWidget(button("确认保存",form,[=]{
+                    if(name->text().trimmed().isEmpty()||address->text().trimmed().isEmpty())return;
+                    command(form,api,"POST","/admin/stations",{{"name",name->text().trimmed()},{"address",address->text().trimmed()},{"longitude",longitude->value()},{"latitude",latitude->value()},{"unit_price",price->value()},{"initial_chargers",quantity->value()},{"initial_charger_kind",type->currentData().toString()},{"initial_charger_power_kw",power->value()}},[=](const Reply &){form->accept();after();});
+                },true));form->show();return;
             }
             if (kind == "chargers") {
                 auto form = new QDialog(d); form->setAttribute(Qt::WA_DeleteOnClose);
+                form->resize(410, 380);
+                form->setMinimumSize(390, 360);
                 auto rows = new QVBoxLayout(form);
-                rows->addWidget(dialogHeader(form, label("新增电桩")));
+                rows->addWidget(dialogHeader(form, label("新增电桩", "font-size:22px;")));
                 auto choices = new QComboBox;
                 for (auto v : stations) { auto o = v.toObject(); choices->addItem(text(o,"name"), text(o,"id")); }
                 auto type = new QComboBox; type->addItem("快充", "fast"); type->addItem("慢充", "slow");
@@ -1221,11 +1558,33 @@ void AdminWindow::manager(const QString &kind) {
             }
             editForm(d, api, "新增记录", "POST", "/admin/" + kind, fields, values, after);
         },
-        true));
-    tools->addWidget(button("编辑", d, [=] {
+        true);
+    addButton->setVisible(kind != "orders");
+    tools->addWidget(addButton);
+    auto editButton = button("编辑", d, [=] {
         auto o = selection();
         if (o.isEmpty())
             return;
+        if (kind == "chargers") {
+            auto form = new QDialog(d); form->setAttribute(Qt::WA_DeleteOnClose);
+            form->resize(410, 380);
+            auto rows = new QVBoxLayout(form);
+            rows->addWidget(dialogHeader(form, label("修改电桩资料", "font-size:22px;")));
+            auto type = new QComboBox; type->addItem("快充", "fast"); type->addItem("慢充", "slow");
+            type->setCurrentIndex(qMax(0, type->findData(text(o, "kind"))));
+            auto power = new QDoubleSpinBox; power->setRange(1, 1000); power->setDecimals(2);
+            power->setValue(number(o, "power_kw")); power->setSuffix(" kW");
+            rows->addWidget(label("充电类型")); rows->addWidget(type);
+            rows->addWidget(label("额定功率")); rows->addWidget(power);
+            rows->addStretch();
+            rows->addWidget(button("确认保存", form, [=] {
+                command(form, api, "PATCH", "/admin/chargers/" + text(o, "id"),
+                    {{"kind",type->currentData().toString()}, {"power_kw",power->value()}},
+                    [=](const Reply &) { form->accept(); after(); });
+            }, true));
+            form->show();
+            return;
+        }
         QList<QPair<QString, QString>> fields;
         if (kind == "users")
             fields = {{"phone", "手机号"}, {"nickname", "昵称"}};
@@ -1235,8 +1594,6 @@ void AdminWindow::manager(const QString &kind) {
                       {"longitude", "经度"},
                       {"latitude", "纬度"},
                       {"unit_price", "单价"}};
-        if (kind == "chargers")
-            fields = {{"code", "电桩编号"}, {"kind", "类型 fast / slow"}, {"power_kw", "功率 kW"}};
         if (fields.isEmpty()) {
             showDetail(d, "订单由状态机控制", o);
             return;
@@ -1246,11 +1603,18 @@ void AdminWindow::manager(const QString &kind) {
             values[f.first] = o[f.first];
         editForm(d, api, "修改资料", "PATCH", "/admin/" + kind + "/" + text(o, "id"), fields,
                  values, after);
-    }));
+    });
+    editButton->setVisible(kind != "orders");
+    tools->addWidget(editButton);
     tools->addWidget(button("详情 / 编号", d, [=] {
         auto o = selection();
-        if (!o.isEmpty())
+        if (!o.isEmpty()) {
+            if (kind == "users") o["id"] = userNumber(o);
+            if (kind == "users") o.remove("avatar_path");
+            if (kind == "stations") o = localizedStationDetails(o, stations);
+            if (kind == "chargers") o["station_id"] = stationNumber(stations, text(o, "station_id"));
             showDetail(d, "记录详情", o);
+        }
     }));
     if (kind != "orders")
         tools->addWidget(button("删除", d, [=] {
@@ -1266,7 +1630,7 @@ void AdminWindow::manager(const QString &kind) {
         }));
     if(kind=="stations") {
         tools->addWidget(button("分时价格",d,[=]{auto o=selection();if(!o.isEmpty())tariffDialog(o,after);}));
-        tools->addWidget(button("解析附近地址",d,[=]{
+        tools->addWidget(button("校准站点地址",d,[=]{
             auto o=selection();if(o.isEmpty())return;
             api->get(QString("/public/map/reverse?latitude=%1&longitude=%2").arg(number(o,"latitude"),0,'f',6).arg(number(o,"longitude"),0,'f',6),d,[=](const Reply &r){
                 if(!r.ok){QMessageBox::warning(d,"地址解析失败",r.error);return;}
@@ -1293,17 +1657,6 @@ void AdminWindow::manager(const QString &kind) {
                      "/admin/users/" + text(o, "id") + "/wallet-adjustments",
                      {{"amount", "金额（可为负）"}, {"reason", "调账原因"}},
                      {{"idempotency_key", uid()}}, after);
-        }));
-        tools->addWidget(button("钱包账本", d, [=] {
-            auto o = selection();
-            if (o.isEmpty())
-                return;
-            api->get("/admin/users/" + text(o, "id") + "/wallet", d, [=](const Reply &r) {
-                if (r.ok)
-                    showDetail(d, "钱包账本", {{"钱包流水", r.data.array()}});
-                else
-                    message(r);
-            });
         }));
     }
     if (kind == "chargers") {
@@ -1345,12 +1698,12 @@ void AdminWindow::manager(const QString &kind) {
     auto footer = new QHBoxLayout;
     layout->addLayout(footer);
     footer->addWidget(button("上一页", d, [=] {
-        *offset = qMax(0, *offset - 200);
+        *offset = qMax(0, *offset - 12);
         (*load)();
     }));
     footer->addWidget(button("下一页", d, [=] {
-        if (items->size() == 200 && (kind == "users" || kind == "orders")) {
-            *offset += 200;
+        if (items->size() == 12) {
+            *offset += 12;
             (*load)();
         }
     }));
