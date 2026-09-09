@@ -22,6 +22,7 @@ function updateLocation(lat,lon,notify=true){
  map.setView([lat,lon],13); if(bridge && notify)bridge.locate(lat,lon);
  status.hidden=false;status.textContent='已更新我的位置，可选择站点导航';
 }
+window.focusLocation=function(){if(locationMarker)map.flyTo(locationMarker.getLatLng(),15,{duration:.45})};
 function locateMe(){
  if(!navigator.geolocation){pickLocation();return}
  navigator.geolocation.getCurrentPosition(p=>updateLocation(p.coords.latitude,p.coords.longitude),()=>{
@@ -37,6 +38,13 @@ window.setStations=function(payload){
  markers.forEach(m=>m.remove());markers.clear();
  rows.forEach(r=>{const name=document.createElement('span');name.textContent=r.name||'充电站';const m=L.marker([r.latitude,r.longitude],{icon:icon(r.id===selected),title:r.name||'充电站'}).addTo(map).bindTooltip(name,{direction:'top',offset:[0,-25],permanent:r.id===selected});m.on('click',()=>{selected=r.id;markers.forEach((other,id)=>other.setIcon(icon(id===selected)));m.openTooltip();if(bridge)bridge.selectStation(r.id)});markers.set(r.id,m)});
  if(!locationMarker && (changed||previous!==selected))fitStations(false);
+};
+window.selectStation=function(id,focus){
+ if(!markers.has(id))return;
+ selected=id;
+ markers.forEach((marker,markerId)=>marker.setIcon(icon(markerId===selected)));
+ const marker=markers.get(id);marker.openTooltip();
+ if(focus)map.flyTo(marker.getLatLng(),15,{duration:.45});
 };
 let routeLayer=null;
 function clearRoute(){if(routeLayer)routeLayer.remove();routeLayer=null;document.getElementById('route').style.display='none'}

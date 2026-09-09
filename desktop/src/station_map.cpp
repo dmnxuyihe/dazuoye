@@ -124,10 +124,26 @@ void StationMap::sync() {
 void StationMap::selectStation(const QString &id) {
     for (const auto &v : stations)
         if (v.toObject()["id"].toString() == id) {
+            if (selected == id) {
+                if (ready)
+                    view->page()->runJavaScript("window.selectStation(" +
+                        QString::fromUtf8(QJsonDocument(QJsonArray{id}).toJson(QJsonDocument::Compact)) + "[0],true)");
+                return;
+            }
             selected = id;
+            if (ready)
+                view->page()->runJavaScript("window.selectStation(" +
+                    QString::fromUtf8(QJsonDocument(QJsonArray{id}).toJson(QJsonDocument::Compact)) + "[0],true)");
             emit stationSelected(id);
             return;
         }
+}
+void StationMap::focusLocation() {
+    if (ready && hasLocation) view->page()->runJavaScript("window.focusLocation()");
+}
+void StationMap::navigateToStation(const QString &id) {
+    selectStation(id);
+    emit bridge->navigationRequested(id);
 }
 void StationMap::fitStations(bool allCities) {
     if (ready) view->page()->runJavaScript(allCities ? "window.fitStations(true)" : "window.fitStations(false)");

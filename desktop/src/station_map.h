@@ -29,6 +29,8 @@ class StationMap : public QWidget {
     void setLocation(double latitude, double longitude);
     void setStations(const QJsonArray &rows, const QString &selected = {});
     void fitStations(bool allCities = false);
+    void focusLocation();
+    void navigateToStation(const QString &id);
     void zoomAt(double factor, const QPointF &anchor);
   public slots:
     void selectStation(const QString &id);
