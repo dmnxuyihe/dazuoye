@@ -69,10 +69,9 @@ for package in (ROOT/'.runtime/qt-deps/usr/share/doc').glob('*'):
 if args.linux_only:
     print(json.dumps({'linux': str(LINUX), 'qt_version': '6.5.3', 'multimedia_backend': 'ffmpeg'}, ensure_ascii=False))
     raise SystemExit(0)
-shutil.copy2(ROOT/'docs/QT_MIGRATION.md',OUT/'使用与架构说明.md')
-shutil.copy2(ROOT/'docs/QT_MAP_FIX.md',OUT/'地图修复说明.md')
-shutil.copy2(ROOT/'docs/QT_WEB_PARITY.md',OUT/'原生页面重构说明.md')
-shutil.copy2(ROOT/'docs/QT_ONLINE_MAP.md',OUT/'在线地图接入说明.md')
+shutil.copy2(ROOT/'docs/QT_MIGRATION.md',OUT/'Qt配置说明.md')
+shutil.copy2(ROOT/'docs/INTEGRATION_LINUX.md',OUT/'Linux配置与验证说明.md')
+shutil.copy2(ROOT/'docs/REQUIREMENTS.md',OUT/'项目需求与完成度.md')
 shutil.copy2(ROOT/'.runtime/qt-webmap/visual-tests.log',OUT/'原生页面定向测试日志.txt')
 shutil.copy2(ROOT/'.runtime/qt-webmap/test-map.log',OUT/'地图测试日志.txt')
 for role in ['admin','user']:
@@ -82,7 +81,6 @@ for name in ['答辩汇报-Qt重构版.pptx','答辩汇报-Qt重构版.pdf','答
     shutil.copy2(ROOT/'deliverables/答辩材料'/name,OUT/name)
 shutil.copy2(ROOT/'.runtime/qt-dialog-fix/build.log',OUT/'编译日志.txt')
 shutil.copy2(ROOT/'.runtime/qt-dialog-fix/tests.log',OUT/'弹窗关闭回归测试.txt')
-shutil.copy2(ROOT/'docs/QT_DIALOG_FIX.md',OUT/'弹窗修复说明.md')
 for name in ['manager','wallet','detail','form']:
     shutil.copy2(ROOT/'.runtime/qt-dialog-fix'/(name+'.png'),OUT/'screenshots'/(name+'-dialog.png'))
 (OUT/'README.txt').write_text('''Electra Qt 桌面端交付 · 2026-09-08 弹窗关闭修复版
@@ -103,7 +101,7 @@ source_files=[]
 for folder in ['desktop','src','scripts','docs']:
     for p in (ROOT/folder).rglob('*'):
         if p.is_file() and '__pycache__' not in p.parts and p.suffix not in ['.pyc'] and not any(s.startswith('build-') for s in p.relative_to(ROOT).parts[:-1]):source_files.append(p)
-for name in ['README.md','ARCHITECTURE.md','DEPLOYMENT.md','pyproject.toml','.env.example']:source_files.append(ROOT/name)
+for name in ['README.md','DEPLOYMENT.md','pyproject.toml','.env.example']:source_files.append(ROOT/name)
 source_zip=OUT/'assignment-qt-source.zip'
 with zipfile.ZipFile(source_zip,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
     for p in sorted(source_files):z.write(p,'assignment/'+str(p.relative_to(ROOT)))

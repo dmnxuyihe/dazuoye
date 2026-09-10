@@ -28,7 +28,7 @@ packages = ["src/charging_core"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "/src", "/desktop", "/scripts", "/docs", "/README.md", "/ARCHITECTURE.md",
+  "/src", "/desktop", "/scripts", "/docs", "/README.md",
   "/DEPLOYMENT.md", "/.env.example", "/pyproject.toml",
 ]
 exclude = ["**/__pycache__", "**/*.pyc"]

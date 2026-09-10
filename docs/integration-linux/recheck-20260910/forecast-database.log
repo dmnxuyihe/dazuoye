@@ -1,1 +1,0 @@
-PASS migrations preserve stations; empty database; dynamic station mapping/name; deduplicated regions; missing region/hour and NULL energy; unsupported date; unknown scope.

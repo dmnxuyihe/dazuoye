@@ -1,6 +1,0 @@
-PASS tariff boundary, midnight, electricity/service fees, target and balance caps
-PASS repeatable migration, verified station address, persistent vehicle/avatar, unique plate
-PASS concurrent reservation/payment, immutable invoice, no debit before payment, released charger, personal periods
-PASS withdrawal application, rejection release, simulated payout, concurrent review and single ledger entry
-PASS charge budget respects withdrawal hold; all balances and holds reconcile
-Disposable schema removed; live data untouched.

@@ -1,10 +1,10 @@
-> 两分支已按 main 用户端 + admin-local 管理端整合；Linux 安装、预测数据导入和本次验证见 [整合说明](docs/INTEGRATION_LINUX.md)。
+> 两分支已按 main 用户端 + admin-local 管理端整合；需求范围和完成度见 [项目需求与完成度](docs/REQUIREMENTS.md)，Linux 安装与验证见 [整合说明](docs/INTEGRATION_LINUX.md)。
 
-> 主前端为 C++17 + Qt 6.5.3 Widgets 用户端与管理端，HTML 保留为视觉先验。当前实现、数据映射和实际验收见 [Qt 基线](docs/QT_MIGRATION.md)。
+> 主前端为 C++17 + Qt 6.5.3 Widgets 用户端与管理端，HTML 保留为视觉先验。Qt 构建和运行配置见 [Qt 基线](docs/QT_MIGRATION.md)。
 
 # Charging Core
 
-这是充电桩平台的最小后端核心。架构取舍与不变量见 `ARCHITECTURE.md`，发布部署流程见 `DEPLOYMENT.md`。
+这是充电桩平台的后端核心和 Qt 客户端。发布部署流程见 `DEPLOYMENT.md`，需求与完成度见 `docs/REQUIREMENTS.md`。
 
 ## 环境
 
@@ -48,19 +48,19 @@ scripts/local_postgres14.sh init
 
 `src/charging_core/static/` 中的 HTML/CSS/JavaScript 为保留的视觉参考。源码仓库不收录 `.runtime/`、本地数据库、`.env`、`deliverables/` 和生成压缩包；旧交付目录可在 Git 历史中查看。
 
-设计参考与此次验证记录见 `docs/UI_REFACTOR.md`。
+头像图像处理是本项目的亮点之一，支持裁剪、缩放、旋转、翻转和亮度调整；完整范围见 `docs/REQUIREMENTS.md`。
 
-大屏已接入完整 UrbanEV GitHub 历史数据目录，提供三屏各 15 块图表、球面区域聚焦和充电负荷日 K。导入、默认演示管理员会话与验收说明见 [UrbanEV 大屏](docs/URBANEV_DASHBOARD.md)。
+大屏已接入 UrbanEV 历史数据目录，提供指标、趋势、站点态势和订单分析；导入与运行配置见 `docs/INTEGRATION_LINUX.md`。
 
-APP 已按 2026-09-06 提供的参考图更新为车辆电量首页、紫色道路地图、充电设置/光环、统计和分时用电界面；素材与验收说明见 [APP 参考图复刻](docs/APP_REFERENCE_UI.md)。
+用户端保留车辆电量首页、紫色地图、充电设置、统计和分时用电界面；当前尚未迁移为原生手机应用。
 
 ## Electra 管理员 Dashboard
 
-入口 `/ui/admin.html`，复刻参考图的深紫色桌面布局，提供 Dashboard、Station、My Trips、History 与全权限管理抽屉。已实现用户、站点、电桩维护、代预约启停、钱包调整、退款、设置、审计和 CSV 导出。业务约束及验证方法见 [ADMIN_CONSOLE.md](docs/ADMIN_CONSOLE.md)。
+入口 `/ui/admin.html`，提供 Dashboard、Station、My Trips、History 与管理抽屉，支持用户、站点、电桩维护、代预约启停、钱包调整、退款、设置和审计。
 
 开发模拟环境可显式设置 `CHARGING_ADMIN_CONSOLE_ENABLED=true` 自动获得管理员会话；默认关闭。运行 `charging-core init-db` 应用 migration 4 后重启服务。已有业务数据保留，新增 console_settings 与账本 adjustment/refund 类型。真实设备与支付仍为模拟。
 
 
 ### 历史负荷预测
 
-管理员新增“负荷预测”入口 `/ui/admin.html#forecast`。已训练岭回归并与昨日、上周基线做时间留出评估，支持全网与275个区域。数据截止2023-02-28，非当前实时预测。复现、指标和限制见 [负荷预测说明](docs/LOAD_FORECAST.md)。
+管理员新增“负荷预测”入口 `/ui/admin.html#forecast`。预测使用历史数据并支持全网及区域范围展示，数据截止 2023-02-28，不代表当前实时负荷；运行配置见 `docs/INTEGRATION_LINUX.md`。

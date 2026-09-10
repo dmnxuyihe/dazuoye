@@ -86,7 +86,7 @@ CHARGING_TEST_API=http://127.0.0.1:4173 .venv/bin/python scripts/check_load_fore
 
 设置 `DISPLAY` 和 `ELECTRA_TEST_PLATFORM=xcb` 可把集成测试放到 X11。三个数据库回归脚本创建并删除各自独立 schema，不使用用户业务数据。Web 预测检查见 `scripts/check_forecast_browser.cjs`，支持 `PLAYWRIGHT_MODULE` 和 `CHARGING_TEST_API`。
 
-本次结果与截图见 [验证记录](integration-linux/)。
+本次结果已在本地运行时目录完成验证；交付文档只保留配置和复现命令，不再附带历史截图与逐次日志。
 
 | 检查 | 实际结果 |
 | --- | --- |
@@ -101,7 +101,7 @@ CHARGING_TEST_API=http://127.0.0.1:4173 .venv/bin/python scripts/check_load_fore
 | Web 预测页面 | 14 个范围、切换、390/768/1440/1920 宽度、导航及无 JS 错误检查通过 |
 | Qt X11 在线地图 | 交互和真实瓦片加载通过 |
 
-可查看 [实际 API 预测页](integration-linux/admin-forecast.png) 和 [长详情滚动窗口](integration-linux/scrollable-details.png)。
+预测页和窗口验证可按上面的启动、复现命令重新生成。
 
 摄像头测试因机器没有摄像头跳过；未安装 OpenCV，没有验证真实人脸处理。Windows 未运行，Wayland 未验证。Qt 地图交互与在线瓦片加载是不同的检查，不以离线通过代替在线通过。
 
@@ -130,4 +130,4 @@ CHARGING_TEST_API=http://127.0.0.1:4173 .venv/bin/python scripts/check_load_fore
 | 全范围接口追加检查 | 两模式各 14 个范围，共 28 次请求通过；校验日期先后、数组长度、有限非负值和上下界 |
 | Web 页面 | 14 范围目录、切换、四种宽度、返回导航和无 JS 错误检查通过 |
 
-本轮日志在 [再次回归证据](integration-linux/recheck-20260910/)。测试写入使用独立 schema，完成后删除。测试通过说明覆盖范围内未发现回归，不等于证明整个项目没有剩余缺陷。Windows、Wayland、真实摄像头及 OpenCV 人脸处理仍未验证；本轮没有逐项验收 9 月 8 日旧问题清单中的所有功能，也没有获得本次管理端预测的专门录屏。因此不能把“可复现的预测/弹窗缺陷已修复”扩展成“所有历史问题全部完成”。
+测试使用独立 schema，完成后删除。测试通过说明覆盖范围内未发现回归，不等于证明整个项目没有剩余缺陷。Windows、Wayland、真实摄像头及 OpenCV 人脸处理仍未验证；本轮没有逐项验收旧问题清单中的所有功能。因此不能把“可复现的预测/弹窗缺陷已修复”扩展成“所有历史问题全部完成”。
