@@ -100,6 +100,11 @@ void fitDialog(QDialog *dialog) {
     if (bounds.isEmpty()) return;
     prepareContent(dialog);
     centerDialogContent(dialog);
+    if (dialog->property("preserveDialogSize").toBool()) {
+        dialog->resize(dialog->size().boundedTo(bounds.size()));
+        centerDialogFrame(dialog);
+        return;
+    }
     dialog->setMinimumSize(0, 0);
     dialog->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     if (dialog->layout()) {

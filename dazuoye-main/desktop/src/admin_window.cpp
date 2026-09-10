@@ -694,7 +694,7 @@ void AdminWindow::stationsPage() {
     auto a = card("车辆与站点", &left);
     a->setMaximumWidth(370);
     auto car = new ArtWidget(ArtWidget::VerticalCar);
-    car->setFixedHeight(210);
+    car->setFixedHeight(260);
     left->addWidget(car);
     for (const auto &v : stations) {
         auto o = v.toObject();
@@ -1096,11 +1096,12 @@ void AdminWindow::auditPage() {
     paging->hide();
 }
 void AdminWindow::forecastPage() {
-    body->addWidget(label("ENERGY INTELLIGENCE / 历史实验",
+    body->addWidget(label("ENERGY INTELLIGENCE / 历史同期模拟",
                           "font-size:10px;letter-spacing:2px;color:#a18bb9;"));
-    body->addWidget(label("负荷预测", "font-size:30px;font-weight:600;"));
+    body->addWidget(label("历史同期负荷预测", "font-size:30px;font-weight:600;"));
     body->addWidget(
-        label("从历史充电节律，观察未来 24 小时的能源需求。", "font-size:12px;color:#b09ac2;"));
+        label("根据当前自然日期匹配 UrbanEV 同期历史日期，模拟预测当天 24 小时负荷。",
+              "font-size:12px;color:#b09ac2;"));
     auto host = new QWidget;
     auto layout = new QVBoxLayout(host);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -1128,9 +1129,25 @@ void AdminWindow::forecastPage() {
             forecastScope = select->itemData(i).toString();
             navigate("forecast");
         });
+        const auto range = d.value("dataset_range").toObject();
+        const QString mappedDate = text(d, "mapped_date");
         layout->addWidget(row(
-            {label("历史实验 · 非实时   数据截止 " + text(d, "cutoff"), "color:#e3b0df;"), select},
+            {label(QString("当前日期：%1　同期映射日期：%2　数据集：UrbanEV　预测模式：历史同期模拟预测")
+                       .arg(text(d, "current_date"), mappedDate.isEmpty() ? "无对应日期" : mappedDate),
+                   "color:#e3b0df;"),
+             select},
             {3, 1}));
+        layout->addWidget(label(
+            QString("数据覆盖：%1 ~ %2").arg(text(range, "start"), text(range, "end")),
+            "color:#a98fba;font-size:11px;"));
+        if (!d.value("available").toBool(true)) {
+            layout->addWidget(emptyPanel("当前日期暂无对应的历史同期数据",
+                                         text(d, "message"), "history"));
+            return;
+        }
+        if (!d.value("history_sufficient").toBool())
+            layout->addWidget(label(text(d, "strategy_message"),
+                                    "color:#edcd79;font-size:12px;"));
         auto history = d.value("history").toArray(), pred = d.value("prediction").toArray();
         const auto historyDates = d.value("history_dates").toArray();
         const auto futureDates = d.value("future_dates").toArray();
@@ -1150,7 +1167,9 @@ void AdminWindow::forecastPage() {
                  metricCard("预测小时峰值", money(peak) + " kWh",
                             peakTime.toString("MM-dd HH:mm") + " · 该小时预测电量"),
                  metricCard("已选用模型", text(d, "model"),
-                            QString("经验范围测试覆盖率 %1%").arg(number(d, "test_coverage")))}));
+                            d.value("history_sufficient").toBool()
+                                ? "按目标日期之前的历史样本训练"
+                                : "历史不足，已使用简化预测策略")}));
         QVBoxLayout *chartLayout;
         auto box = card("充电需求趋势 · 最近48小时与未来24小时", &chartLayout);
         auto chart = baseChart("");
@@ -1335,6 +1354,7 @@ void AdminWindow::manager(const QString &kind) {
                                     .value(kind, "运营数据管理");
     auto d = new QDialog(this);
     d->setAttribute(Qt::WA_DeleteOnClose);
+    d->setProperty("preserveDialogSize", true);
     d->setWindowTitle(managerName);
     d->resize(kind == "users" ? 1200 : 1100, 650);
     auto layout = new QVBoxLayout(d);

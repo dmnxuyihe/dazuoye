@@ -10,11 +10,37 @@ import asyncpg
 from charging_core.config import Settings
 from charging_core.db import initialize_schema
 
+PINNED_COMMIT = '44f2aa0c8d89f192bce00bafb0def74a21b39c68'
+
+
+def load_or_create_manifest(root):
+    manifest_path = root / 'manifest.json'
+    if manifest_path.exists():
+        return json.loads(manifest_path.read_text())
+    # GitHub's Download ZIP does not include the downloader-generated manifest.
+    # Build an equivalent local integrity list so manual downloads can be imported.
+    files = []
+    for path in sorted((root / 'data').rglob('*')):
+        if path.is_file():
+            content = path.read_bytes()
+            files.append({
+                'path': path.relative_to(root).as_posix(),
+                'bytes': len(content),
+                'sha256': hashlib.sha256(content).hexdigest(),
+            })
+    if not files:
+        raise FileNotFoundError(f'UrbanEV data files not found under {root / "data"}')
+    manifest = {'commit': PINNED_COMMIT, 'files': files, 'source': 'manual-github-zip'}
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    print('Created local manifest for', len(files), 'manually downloaded files')
+    return manifest
+
+
 async def main(root):
     settings = Settings()
     await initialize_schema(settings)
     db = await asyncpg.connect(settings.database_url, server_settings={'search_path': settings.database_schema})
-    manifest = json.loads((root/'manifest.json').read_text())
+    manifest = load_or_create_manifest(root)
     try:
         existing = await db.fetchval("SELECT metadata FROM dataset_metadata WHERE name='UrbanEV-full'")
         if existing and json.loads(existing)['commit'] == manifest['commit']:

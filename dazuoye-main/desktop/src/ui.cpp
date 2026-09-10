@@ -346,6 +346,7 @@ QWidget *dialogHeader(QDialog *dialog, QLabel *title) {
 void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
     auto d = new QDialog(p);
     d->setAttribute(Qt::WA_DeleteOnClose);
+    d->setProperty("preserveDialogSize", true);
     d->setWindowTitle(title);
     auto l = new QVBoxLayout(d);
     l->addWidget(dialogHeader(d, label(title, "font-size:22px;")));
@@ -370,6 +371,8 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
         fields.insert(pair.first,pair.second);
     fields.insert("entry_type", "收支类型"); fields.insert("balance_after", "交易后余额");
     fields.insert("created_at", "创建时间"); fields.insert("order_id", "订单编号");
+    fields.insert("phone", "手机号"); fields.insert("nickname", "昵称");
+    fields.insert("user_id", "用户编号"); fields.insert("station_id", "站点编号");
     fields.insert("amount", "金额"); fields.insert("id", "记录编号");
     fields.insert("code", "电桩编号"); fields.insert("status", "状态");
     fields.insert("power_kw", "功率 kW"); fields.insert("total_sessions", "累计充电次数");
@@ -408,12 +411,21 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
             continue;
         }
         QString value;
-        if (it.value().isObject() || it.value().isArray())
+        if (it.value().isObject()) {
+            QStringList lines;
+            const auto object = it.value().toObject();
+            for (auto field = object.begin(); field != object.end(); ++field) {
+                const auto raw = field.value().toVariant().toString();
+                const auto dateTime = localDateTime(raw);
+                lines << QString("%1：%2")
+                             .arg(fields.value(field.key()).toString(field.key()),
+                                  dateTime != raw ? dateTime : statusText(raw));
+            }
+            value = lines.isEmpty() ? "无" : lines.join("\n");
+        } else if (it.value().isArray()) {
             value = QString::fromUtf8(
-                it.value().isObject()
-                    ? QJsonDocument(it.value().toObject()).toJson(QJsonDocument::Indented)
-                    : QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
-        else {
+                QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
+        } else {
             const auto raw = it.value().toVariant().toString();
             const auto dateTime = localDateTime(raw);
             value = dateTime != raw ? dateTime : statusText(raw);
@@ -424,9 +436,21 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
         content->setTextInteractionFlags(Qt::TextSelectableByMouse);
         form->addRow(field, content);
     }
-    l->addWidget(content);
+    auto scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setWidget(content);
+    l->addWidget(scroll, 1);
     l->addWidget(button("关闭", d, [d] { d->accept(); }, true));
-    d->resize(620, 560);
+    const int fieldCount = data.size();
+    if (fieldCount <= 8)
+        d->resize(560, 440);
+    else if (fieldCount <= 14)
+        d->resize(640, 520);
+    else
+        d->resize(680, 580);
     d->show();
 }
 void command(QWidget *p, ApiClient *api, const QString &method, const QString &path,

@@ -1,9 +1,15 @@
 import json
+from datetime import date, datetime, time
 from typing import Annotated, Literal
 from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Response, HTTPException, Query
-from .forecast import console_forecast, console_scopes, load_forecast
+from .forecast import (
+    BUSINESS_STATIONS,
+    console_scopes,
+    historical_same_period_forecast,
+    map_current_date_to_dataset_date,
+)
 from pydantic import BaseModel, Field, field_validator
 from .service import ChargingService
 
@@ -65,17 +71,52 @@ def build_console_router(get_service, require_admin):
     @router.get("/console/forecast")
     async def forecast(
         _: Admin,
+        s: Service,
         scope: str = Query(
             default="business", pattern=r"^(all|business|station-[0-9]{1,6})$"
         ),
     ):
-        artifact = load_forecast()
-        if artifact is None:
-            return {"ready": False, "message": "尚未生成历史预测，请运行训练脚本。"}
-        result = console_forecast(artifact, scope)
-        if result is None:
+        current_date = date.today()
+        mapped_date = map_current_date_to_dataset_date(current_date)
+        scopes = console_scopes()
+        selected_scope = next((item for item in scopes if item["id"] == scope), None)
+        if selected_scope is None:
             raise HTTPException(status_code=404, detail="区域不存在")
-        metadata = {**artifact["metadata"], "scopes": console_scopes()}
+        metadata = {
+            "source": "UrbanEV",
+            "timezone": "Asia/Shanghai",
+            "scopes": scopes,
+        }
+        if mapped_date is None:
+            result = historical_same_period_forecast([], current_date, selected_scope["label"])
+            return {**metadata, "scope": scope, **result}
+
+        target_start = datetime.combine(mapped_date, time.min)
+        query = """
+            SELECT observed_at, SUM(energy_kwh)::double precision AS energy
+            FROM urbanev_observation
+            WHERE observed_at < $1
+        """
+        arguments = [target_start]
+        if scope == "business":
+            query += " AND zone_id = ANY($2::integer[])"
+            arguments.append([int(item[2]) for item in BUSINESS_STATIONS])
+        elif scope.startswith("station-"):
+            station_id = scope.removeprefix("station-")
+            station = next((item for item in BUSINESS_STATIONS if item[0] == station_id), None)
+            if station is None:
+                raise HTTPException(status_code=404, detail="站点不存在")
+            query += " AND zone_id = $2"
+            arguments.append(int(station[2]))
+        query += " GROUP BY observed_at ORDER BY observed_at"
+        rows = await s.pool.fetch(query, *arguments)
+        result = historical_same_period_forecast(
+            [(row["observed_at"], row["energy"]) for row in rows],
+            current_date,
+            selected_scope["label"],
+        )
+        if not rows:
+            result["message"] = "UrbanEV 历史观测数据尚未导入，无法生成同期预测"
         return {**metadata, "scope": scope, **result}
 
     @router.get("/console/settings")
