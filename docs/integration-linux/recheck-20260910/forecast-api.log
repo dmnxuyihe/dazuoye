@@ -1,0 +1,1 @@
+PASS: future-target perturbation leaves forecast/weights/scale unchanged; chronological partitions; 276 valid scopes; validation-only model selection; API admin auth/region/404/422/read-only role protection.
