@@ -2,7 +2,7 @@
 
 ## 目标与边界
 
-交付包括 C++17 / Qt 6.5.3 Widgets 用户端与管理端、保留的 Web 客户端和运营大屏、统一 FastAPI 服务，以及已训练的历史负荷预测。Qt 当前范围、真实数据映射与验收见 docs/QT_MIGRATION.md，预测口径见 docs/LOAD_FORECAST.md。
+交付包括 C++17 / Qt 6.5.3 Widgets 用户端与管理端、保留的 Web 客户端和运营大屏、统一 FastAPI 服务，以及打包历史预测和数据库驱动的历史同期模拟。同期模拟的数据完整性与运行约束见 docs/INTEGRATION_LINUX.md。Qt 当前范围、真实数据映射与验收见 docs/QT_MIGRATION.md，预测口径见 docs/LOAD_FORECAST.md。
 
 ## 系统形态
 

@@ -16,6 +16,7 @@ async def main():
     env={**os.environ,'CHARGING_DATABASE_SCHEMA':schema,'CHARGING_ADMIN_CONSOLE_ENABLED':'true','CHARGING_DEMO_ADMIN_ENABLED':'true','CHARGING_ENVIRONMENT':'development','CHARGING_DEV_OTP_CODE':'246810','CHARGING_LOG_DIR':str(ROOT/'.runtime/qt-migration/test-logs')}
     db=await asyncpg.connect(settings.database_url)
     server=None
+    (ROOT/'.runtime/qt-migration').mkdir(parents=True, exist_ok=True)
     with (ROOT/'.runtime/qt-migration/test-server.log').open('w') as log:
         try:
             subprocess.run([str(ROOT/'.venv/bin/charging-core'),'init-db'],cwd=ROOT,env=env,check=True,stdout=log,stderr=log)

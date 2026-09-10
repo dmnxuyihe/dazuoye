@@ -91,6 +91,47 @@ class DialogTest : public QObject {
         QCOMPARE(save.result(),int(QDialog::Accepted));
         QCOMPARE(save.selectedFiles(),QStringList{temp.filePath("records.csv")});
     }
+    void managerSizeAndScreenBounds() {
+        owner.resize(780,700);
+        QDialog d(&owner);
+        d.setProperty("preserveDialogSize",true);
+        d.resize(720,620);
+        auto layout=new QVBoxLayout(&d);
+        layout->addWidget(dialogHeader(&d,label("用户数据管理")));
+        layout->addWidget(new QTableWidget(20,8));
+        layout->addWidget(button("关闭",&d,[&d]{d.close();}));
+        d.show();QTest::qWait(100);
+        QVERIFY2(d.width()>=700 && d.height()>=600, qPrintable(QString("Unexpected manager size: %1x%2").arg(d.width()).arg(d.height())));
+        QVERIFY(bounds().contains(d.frameGeometry()));
+        capture(&d,"manager-size");
+    }
+    void tallDetailsRemainScrollable() {
+        owner.resize(460,600);
+        QJsonObject data;
+        for(int i=0;i<30;++i)data[QString("字段%1").arg(i)]=QString(120,'x');
+        showDetail(&owner,"完整数据详情",data);
+        auto d=owner.findChild<QDialog *>();QVERIFY(d);
+        QTest::qWait(100);
+        QVERIFY(bounds().contains(d->frameGeometry()));
+        auto scroll=d->findChild<QScrollArea *>();QVERIFY(scroll);
+        QVERIFY(scroll->verticalScrollBar()->maximum()>0);
+        auto close=d->findChild<QPushButton *>("dialog-close");QVERIFY(close);
+        QVERIFY(d->rect().contains(QRect(close->mapTo(d,QPoint()),close->size())));
+        capture(d,"tall-details");
+    }
+    void nestedDetailsKeepValues() {
+        showDetail(&owner,"审计详情",{{"details",QJsonObject{
+            {"before",QJsonObject{{"nickname","旧昵称"}}},
+            {"after",QJsonObject{{"nickname","新昵称"}}},
+            {"tariff",QJsonArray{QJsonObject{{"electricity_price",1.25}}}}}}});
+        auto d=owner.findChild<QDialog *>();QVERIFY(d);
+        QTest::qWait(100);
+        QString displayed;
+        for(auto label:d->findChildren<QLabel *>())displayed+=label->text();
+        QVERIFY(displayed.contains("旧昵称"));
+        QVERIFY(displayed.contains("新昵称"));
+        QVERIFY(displayed.contains("1.25"));
+    }
     void palette() {
         QVERIFY(qApp->palette().color(QPalette::Base).lightnessF()<.3);
         QVERIFY(qApp->palette().color(QPalette::Text).lightnessF()>.65);

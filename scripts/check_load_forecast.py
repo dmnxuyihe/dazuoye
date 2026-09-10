@@ -1,6 +1,7 @@
 """Check causal feature boundaries, serialized outputs and protected forecast API."""
 import importlib.util
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 import urllib.request
@@ -39,7 +40,7 @@ for result in artifact['results'].values():
 
 
 def request(path, token=None, method='GET'):
-    req = urllib.request.Request('http://127.0.0.1:4173' + path, method=method, headers={'Authorization': 'Bearer ' + token} if token else {})
+    req = urllib.request.Request(os.environ.get('CHARGING_TEST_API', 'http://127.0.0.1:4173') + path, method=method, headers={'Authorization': 'Bearer ' + token} if token else {})
     try:
         with urllib.request.urlopen(req, timeout=20) as response:
             return response.status, json.load(response)
@@ -49,11 +50,18 @@ def request(path, token=None, method='GET'):
 assert request('/admin/console/forecast')[0] == 401
 _, session = request('/auth/console', method='POST')
 token = session['access_token']
-status, body = request('/admin/console/forecast', token)
+status, body = request('/admin/console/forecast?mode=artifact&scope=all', token)
 assert status == 200 and body['scope'] == 'all' and body['ready']
-zone = meta['scopes'][1]['id']
-assert request('/admin/console/forecast?scope=' + zone, token)[1]['scope'] == zone
-assert request('/admin/console/forecast?scope=999999', token)[0] == 404
+assert request('/admin/console/forecast?mode=artifact&scope=station-1075', token)[1]['scope'] == 'station-1075'
+status, same = request('/admin/console/forecast', token)
+assert status == 200 and same['scope'] == 'business' and same['ready']
+assert same['forecast_type'] == 'historical_same_period'
+assert len(same['scopes']) >= 2
+if same['available']:
+    assert len(same['prediction']) == 24
+    assert len(same['history']) == len(same['history_dates'])
+    assert same['history_dates'][-1] < same['future_dates'][0]
+assert request('/admin/console/forecast?scope=station-999999', token)[0] == 404
 assert request('/admin/console/forecast?scope=../x', token)[0] == 422
 _, demo = request('/auth/demo', method='POST')
 assert request('/admin/console/forecast', demo['access_token'])[0] == 403

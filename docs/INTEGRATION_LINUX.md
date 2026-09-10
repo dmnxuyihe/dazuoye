@@ -1,0 +1,94 @@
+# 两分支整合与 Linux 运行
+
+2026-09-10。来源：main `2646438`、admin-local `88fa23b`。工作树以 main 为基础，接入 admin-local 的管理端前端；保留 main 的用户端、摄像头/头像、地图与底部抽屉逻辑。admin-local 的 `dazuoye-main/` 外层目录不复制到项目中。
+
+## 修复与数据边界
+
+- 管理端保留同期预测、站点竖向车辆展示、记录时间格式和管理详情布局。
+- 同期预测的站点名称、来源编号及 `zone_id` 从业务数据库读取；同一区域只累计一次。区域观测不等于单站实际电表数据。
+- 数据缺小时/缺天、NULL、非有限数或负电量不能拼成连续历史。只使用目标日前连续完整天数；前一天不完整时显示空态与导入提示，不伪造日期或填零。
+- 日期按北京时间映射到 2022-09-01 至 2023-02-28。3–8 月及闰日没有对应数据，显示不可用；不是当前实时预测。少于 21 天使用可用的历史基线；没有验证样本时显示“暂无验证数据”，不冒充零误差或测试覆盖率。
+- NumPy 成为默认运行依赖，因为同期接口需要它；训练计算在线程池执行。原打包实验通过 `mode=artifact` 保留，Web 预测页显式使用这一模式。
+- 管理表格原本预设 720×620，通用弹窗策略却缩成 320×345；现在保留预设大小并扣除窗口边框、限制在屏幕/所属窗口范围内。长详情滚动，标题关闭按钮保持可见。
+- 嵌套 JSON 原本经 `QVariant::toString()` 变空；现在保留修改前后值和嵌套数组。业务时间固定显示北京时间，避免 UTC Linux 上少 8 小时。
+
+两个远端分支的 `schema.sql` 相同，本次没有重建业务表或添加新迁移。验证了已有 schema 再次初始化后保留业务记录。未获得用户现有数据库副本，不能断言其手工修改与仓库一致；也未收到演示视频，因此截图中的具体视频效果尚未逐项核对。
+
+## Linux 准备与启动
+
+需要 Python 3.12、C++17 编译器、CMake、Ninja、PostgreSQL 14，以及 Qt 6.5.3 的 Widgets/Network/WebSockets/Sql/Svg/Charts/WebEngineWidgets/WebChannel/Multimedia/MultimediaWidgets/Test 模块。OpenCV 为可选依赖；没有它时人脸处理不可用，普通头像仍可用。
+
+以 Ubuntu 22.04 为例，系统依赖可由管理员安装：
+
+```bash
+sudo apt-get install build-essential cmake ninja-build libgl-dev libegl-dev \
+  libopengl-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 \
+  libxcb-keysyms1 libxcb-image0 libxcb-render-util0 libxcb-xinerama0 \
+  libnss3 libnspr4 libasound2 libxcomposite1 libxdamage1 libxrandr2 libxtst6
+# 可选人脸处理：sudo apt-get install libopencv-dev
+python3.12 -m venv .venv
+.venv/bin/pip install -e . aqtinstall
+.venv/bin/aqt install-qt linux desktop 6.5.3 gcc_64 -O .runtime/qt \
+  -m qtcharts qtwebsockets qtwebchannel qtwebengine qtpositioning qtmultimedia
+cp .env.example .env
+# 编辑 .env，设置独立数据库地址及随机 JWT 密钥。
+bash scripts/local_postgres14.sh init
+.venv/bin/charging-core set-admin-password --username admin
+BUILD_TESTING=ON bash desktop/scripts/build-linux.sh
+.venv/bin/charging-core serve --host 127.0.0.1 --port 4173
+```
+
+在有桌面的终端分别启动：
+
+```bash
+bash scripts/run_qt.sh user --api http://127.0.0.1:4173
+bash scripts/run_qt.sh admin --api http://127.0.0.1:4173
+```
+
+仅演示环境可显式启用 `.env` 中的 `CHARGING_ADMIN_CONSOLE_ENABLED=true` 获得自动管理会话。初次初始化只导入业务样本，不包含完整历史观测；预测空态时执行：
+
+```bash
+.venv/bin/python scripts/download_urbanev.py
+.venv/bin/python scripts/import_urbanev.py .runtime/urbanev-full
+```
+
+下载器按固定上游提交校验文件，导入器不改业务账户、订单或余额。无需重训旧打包实验。自装 Qt 可设 `QT_ROOT`；自定义构建目录可设 `ELECTRA_BUILD_DIR`，构建与启动脚本均支持。`CHARGING_LOCAL_PG_PORT` 必须与 `.env` 的数据库端口一致；测试机器因默认端口已占用，使用隔离端口 55439，没有停止原服务。
+
+## 验证与限制
+
+本次实际使用 Ubuntu 22.04 x86_64、Python 3.12、Qt 6.5.3、PostgreSQL 14，在无 sudo 环境把依赖解包到本项目 `.runtime/`；X11 测试使用 Xvfb。完整 UrbanEV 导入 23 个校验文件、275 区域、1,194,600 条小时观测。
+
+复现命令（Qt 库与插件路径需对应自己的 SDK）：
+
+```bash
+export LD_LIBRARY_PATH="$PWD/.runtime/qt/6.5.3/gcc_64/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$PWD/.runtime/qt/6.5.3/gcc_64/plugins"
+ctest --test-dir .runtime/qt-build --output-on-failure
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python scripts/check_same_period_forecast.py
+.venv/bin/python scripts/check_qt_completion.py
+.venv/bin/python scripts/check_qt_integration.py
+# 需已启动演示 API：
+CHARGING_TEST_API=http://127.0.0.1:4173 .venv/bin/python scripts/check_load_forecast.py
+```
+
+设置 `DISPLAY` 和 `ELECTRA_TEST_PLATFORM=xcb` 可把集成测试放到 X11。三个数据库回归脚本创建并删除各自独立 schema，不使用用户业务数据。Web 预测检查见 `scripts/check_forecast_browser.cjs`，支持 `PLAYWRIGHT_MODULE` 和 `CHARGING_TEST_API`。
+
+本次结果与截图见 [验证记录](integration-linux/)。
+
+| 检查 | 实际结果 |
+| --- | --- |
+| Linux 两端与测试目标编译 | 通过 |
+| CTest | 5/5 组通过；内部摄像头用例跳过 1 项 |
+| X11 弹窗回归 | 11 项通过（含初始化/清理） |
+| X11 + 实际 API + 隔离数据库 | 5 项通过（含初始化/清理），覆盖充值、预约、启停、付款、管理操作、跨客户端统计刷新 |
+| 同期预测单元回归 | 6 项通过 |
+| 数据库映射、缺失观测及迁移回归 | 通过 |
+| 计费、并发预约/付款、提现与余额约束 | 通过 |
+| 预测 API 权限及打包实验检查 | 通过 |
+| Web 预测页面 | 14 个范围、切换、390/768/1440/1920 宽度、导航及无 JS 错误检查通过 |
+| Qt X11 在线地图 | 交互和真实瓦片加载通过 |
+
+可查看 [实际 API 预测页](integration-linux/admin-forecast.png) 和 [长详情滚动窗口](integration-linux/scrollable-details.png)。
+
+摄像头测试因机器没有摄像头跳过；未安装 OpenCV，没有验证真实人脸处理。Windows 未运行，Wayland 未验证。Qt 地图交互与在线瓦片加载是不同的检查，不以离线通过代替在线通过。

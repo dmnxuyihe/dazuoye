@@ -1,3 +1,5 @@
+> 两分支已按 main 用户端 + admin-local 管理端整合；Linux 安装、预测数据导入和本次验证见 [整合说明](docs/INTEGRATION_LINUX.md)。
+
 > 主前端为 C++17 + Qt 6.5.3 Widgets 用户端与管理端，HTML 保留为视觉先验。当前实现、数据映射和实际验收见 [Qt 基线](docs/QT_MIGRATION.md)。
 
 # Charging Core

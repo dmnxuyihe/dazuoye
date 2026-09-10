@@ -106,9 +106,13 @@ void fitDialog(QDialog *dialog) {
         dialog->layout()->setSizeConstraint(QLayout::SetMinAndMaxSize);
         dialog->layout()->activate();
     }
-    QSize target = dialog->sizeHint().expandedTo(QSize(320, 180));
+    // Manager/detail dialogs intentionally reserve room for tables and scroll areas.
+    // Still apply the common content preparation and platform-frame bounds.
+    QSize target = dialog->property("preserveDialogSize").toBool()
+                       ? dialog->size() : dialog->sizeHint().expandedTo(QSize(320, 180));
     if (qobject_cast<QFileDialog *>(dialog)) target = target.expandedTo(QSize(560, 380));
-    target = target.boundedTo(bounds.size());
+    const QSize frameExtra = dialog->frameGeometry().size() - dialog->size();
+    target = target.boundedTo(bounds.size() - frameExtra);
     dialog->resize(target);
     centerDialogFrame(dialog);
 }

@@ -8,7 +8,7 @@ async function renderForecast() {
   container.innerHTML = '<p class="forecast-notice">正在读取预测结果…</p>';
   try {
     const d = await api(
-      "/admin/console/forecast?scope=" + encodeURIComponent(selector.value),
+      "/admin/console/forecast?mode=artifact&scope=" + encodeURIComponent(selector.value),
     );
     if (request !== forecastRequest) return;
     if (!d.ready) {
@@ -54,7 +54,7 @@ async function renderForecast() {
       <div class="forecast-kpis">
         <article class="card"><small>未来 24 小时预测电量</small><strong>${num(total)} <em>kWh</em></strong><p>${esc(d.future_dates[0].slice(0, 10))} · ${esc(d.label)}</p></article>
         <article class="card"><small>预测小时峰值</small><strong>${num(peak)} <em>kWh/小时</em></strong><p>${String(peakHour).padStart(2, "0")}:00 · ${d.high_hours} 小时超过历史高负荷阈值</p></article>
-        <article class="card"><small>测试集加权绝对百分比误差</small><strong>${selected.wape === null ? "—" : num(selected.wape)}<em>%</em></strong><p>按验证集选用 · ${esc(d.model)}</p></article>
+        <article class="card"><small>测试集加权绝对百分比误差</small><strong>${selected?.wape == null ? "—" : num(selected.wape)}<em>%</em></strong><p>按验证集选用 · ${esc(d.model)}</p></article>
         <article class="card"><small>经验范围 · 测试覆盖率</small><strong>${num(d.test_coverage)}<em>%</em></strong><p>验证集 90% 绝对误差分位数构建</p></article>
       </div>
       <div class="forecast-grid"><article class="card forecast-main"><div class="forecast-title"><div><small>24H / DEMAND OUTLOOK</small><h2>充电需求趋势</h2></div><span class="forecast-chip">${esc(d.model)}</span></div>

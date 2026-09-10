@@ -33,7 +33,7 @@ QString localDateTime(const QString &value) {
     auto dateTime = QDateTime::fromString(normalized, Qt::ISODateWithMs);
     if (!dateTime.isValid()) dateTime = QDateTime::fromString(normalized, Qt::ISODate);
     if (!dateTime.isValid()) return value;
-    return dateTime.toLocalTime().toString("yyyy-MM-dd HH:mm:ss");
+    return dateTime.toOffsetFromUtc(8 * 3600).toString("yyyy-MM-dd HH:mm:ss");
 }
 QString uid() {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -346,6 +346,7 @@ QWidget *dialogHeader(QDialog *dialog, QLabel *title) {
 void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
     auto d = new QDialog(p);
     d->setAttribute(Qt::WA_DeleteOnClose);
+    d->setProperty("preserveDialogSize", true);
     d->setWindowTitle(title);
     auto l = new QVBoxLayout(d);
     l->addWidget(dialogHeader(d, label(title, "font-size:22px;")));
@@ -370,6 +371,8 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
         fields.insert(pair.first,pair.second);
     fields.insert("entry_type", "收支类型"); fields.insert("balance_after", "交易后余额");
     fields.insert("created_at", "创建时间"); fields.insert("order_id", "订单编号");
+    fields.insert("phone", "手机号"); fields.insert("nickname", "昵称");
+    fields.insert("user_id", "用户编号"); fields.insert("station_id", "站点编号");
     fields.insert("amount", "金额"); fields.insert("id", "记录编号");
     fields.insert("code", "电桩编号"); fields.insert("status", "状态");
     fields.insert("power_kw", "功率 kW"); fields.insert("total_sessions", "累计充电次数");
@@ -408,12 +411,27 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
             continue;
         }
         QString value;
-        if (it.value().isObject() || it.value().isArray())
+        if (it.value().isObject()) {
+            QStringList lines;
+            const auto object = it.value().toObject();
+            for (auto field = object.begin(); field != object.end(); ++field) {
+                // QVariant::toString() discards nested objects/arrays from audit
+                // before/after snapshots and structured database fields.
+                const auto raw = field.value().isObject()
+                    ? QString::fromUtf8(QJsonDocument(field.value().toObject()).toJson(QJsonDocument::Indented))
+                    : field.value().isArray()
+                        ? QString::fromUtf8(QJsonDocument(field.value().toArray()).toJson(QJsonDocument::Indented))
+                        : field.value().toVariant().toString();
+                const auto dateTime = localDateTime(raw);
+                lines << QString("%1：%2")
+                             .arg(fields.value(field.key()).toString(field.key()),
+                                  dateTime != raw ? dateTime : statusText(raw));
+            }
+            value = lines.isEmpty() ? "无" : lines.join("\n");
+        } else if (it.value().isArray()) {
             value = QString::fromUtf8(
-                it.value().isObject()
-                    ? QJsonDocument(it.value().toObject()).toJson(QJsonDocument::Indented)
-                    : QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
-        else {
+                QJsonDocument(it.value().toArray()).toJson(QJsonDocument::Indented));
+        } else {
             const auto raw = it.value().toVariant().toString();
             const auto dateTime = localDateTime(raw);
             value = dateTime != raw ? dateTime : statusText(raw);
@@ -424,9 +442,21 @@ void showDetail(QWidget *p, const QString &title, const QJsonObject &data) {
         content->setTextInteractionFlags(Qt::TextSelectableByMouse);
         form->addRow(field, content);
     }
-    l->addWidget(content);
+    auto scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setWidget(content);
+    l->addWidget(scroll, 1);
     l->addWidget(button("关闭", d, [d] { d->accept(); }, true));
-    d->resize(620, 560);
+    const int fieldCount = data.size();
+    if (fieldCount <= 8)
+        d->resize(560, 440);
+    else if (fieldCount <= 14)
+        d->resize(640, 520);
+    else
+        d->resize(680, 580);
     d->show();
 }
 void command(QWidget *p, ApiClient *api, const QString &method, const QString &path,
@@ -563,29 +593,42 @@ void ArtWidget::paintEvent(QPaintEvent *) {
         write(QRectF(w - 82, h - 21, 80, 18), "演示车辆", 9, QColor("#766184"));
         return;
     }
-    if (kind == Car || kind == TopCar) {
+    if (kind == Car || kind == VerticalCar || kind == TopCar) {
         QPixmap image(":/assets/" +
-                      QString(kind == Car ? "admin-xray-car.png" : "ev-top-photo.png"));
+                      QString(kind == TopCar ? "ev-top-photo.png" : "admin-xray-car.png"));
+        if (kind == VerticalCar)
+            image = image.transformed(QTransform().rotate(90), Qt::SmoothTransformation);
         auto size = image.size().scaled(QSize(width() - 4, height() - 4), Qt::KeepAspectRatio);
         QRectF target((w - size.width()) / 2, (h - size.height()) / 2, size.width(), size.height());
         p.drawPixmap(target, image, image.rect());
-        if (kind == Car) {
+        if (kind == Car || kind == VerticalCar) {
             QPainterPath capsule;
             capsule.addRoundedRect(target.adjusted(4, 6, -4, -6), target.height() / 2,
                                    target.height() / 2);
             p.save();
             p.setClipPath(capsule);
-            QLinearGradient tint(target.center().x(), 0, target.right(), 0);
+            QLinearGradient tint = kind == VerticalCar
+                                       ? QLinearGradient(0, target.center().y(), 0, target.bottom())
+                                       : QLinearGradient(target.center().x(), 0, target.right(), 0);
             tint.setColorAt(0, QColor("#b0073039"));
             tint.setColorAt(1, QColor("#c002a0c7"));
-            p.fillRect(
-                QRectF(target.center().x() + 14, target.top(), target.width() / 2, target.height()),
-                tint);
+            const QRectF tinted = kind == VerticalCar
+                                      ? QRectF(target.left(), target.center().y() + 10,
+                                               target.width(), target.height() / 2)
+                                      : QRectF(target.center().x() + 14, target.top(),
+                                               target.width() / 2, target.height());
+            p.fillRect(tinted, tint);
             p.setPen(QPen(QColor("#72f5ed"), 1));
-            p.drawLine(QPointF(target.center().x() + 14, target.top()),
-                       QPointF(target.center().x() + 14, target.bottom()));
-            p.translate(target.right() - target.width() * .2, target.center().y());
-            p.rotate(-90);
+            if (kind == VerticalCar) {
+                p.drawLine(QPointF(target.left(), target.center().y() + 10),
+                           QPointF(target.right(), target.center().y() + 10));
+                p.translate(target.center().x(), target.bottom() - target.height() * .2);
+            } else {
+                p.drawLine(QPointF(target.center().x() + 14, target.top()),
+                           QPointF(target.center().x() + 14, target.bottom()));
+                p.translate(target.right() - target.width() * .2, target.center().y());
+                p.rotate(-90);
+            }
             QFont f = font();
             f.setPixelSize(33);
             f.setWeight(QFont::DemiBold);
