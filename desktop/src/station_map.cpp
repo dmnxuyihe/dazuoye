@@ -111,7 +111,7 @@ StationMap::StationMap(QWidget *parent) : QWidget(parent) {
     html.replace("<script src=\"leaflet.js\"></script>", "<script>" + read(":/map/leaflet.js") + "</script>");
     html.replace("<script src=\"qrc:///qtwebchannel/qwebchannel.js\"></script>", "<script>" + read(":/qtwebchannel/qwebchannel.js") + "</script>");
     QFile font(":/map/map-labels.woff2"); font.open(QIODevice::ReadOnly);
-    html.replace("</head>", "<style>@font-face{font-family:MapLabels;src:url(data:font/woff2;base64," + QString::fromLatin1(font.readAll().toBase64()) + ")}html,body,button,.leaflet-container,.leaflet-tooltip,.leaflet-control{font-family:MapLabels,sans-serif}</style></head>");
+    html.replace("</head>", "<style>@font-face{font-family:MapLabels;src:url(data:font/woff2;base64," + QString::fromLatin1(font.readAll().toBase64()) + ")}html,body,#map,button,input,select,textarea,.leaflet-container,.leaflet-tooltip,.leaflet-control{font-family:MapLabels,sans-serif}</style></head>");
     view->setHtml(html, QUrl("https://lv-l40s-liuzihang.taild6df1c.ts.net/qt/"));
 }
 void StationMap::setCompact(bool enabled) {

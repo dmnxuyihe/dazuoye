@@ -18,6 +18,25 @@ class MapTest : public QObject {
         map.setStations(rows,"a");
         auto view=map.findChild<QWebEngineView*>();QVERIFY(view);
         QTRY_COMPARE_WITH_TIMEOUT(js(view,"typeof markers!=='undefined'?markers.size:0").toInt(),2,15000);
+        QTRY_VERIFY_WITH_TIMEOUT(js(view,
+            "Array.from(document.fonts).some(f => f.family === 'MapLabels' && f.status === 'loaded')").toBool(),5000);
+        for (const auto selector : {"#map", ".map-tools-toggle", ".tools select", ".tools input", ".leaflet-tooltip", "#status"}) {
+            QVERIFY2(js(view, QString("getComputedStyle(document.querySelector('%1')).fontFamily.includes('MapLabels')")
+                .arg(selector)).toBool(), selector);
+        }
+        // Dynamic station/address characters absent from the former fixture subset.
+        QVERIFY(js(view, R"JS((() => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.font = '32px MapLabels';
+            const pixels = text => {
+                ctx.clearRect(0, 0, 64, 64); ctx.fillText(text, 2, 40);
+                return canvas.toDataURL();
+            };
+            const missing = pixels(String.fromCodePoint(0x10ffff));
+            return ['科', '技'].every(text => pixels(text) !== missing);
+        })())JS").toBool());
         QVERIFY(js(view,"map.getCenter().lng < 115").toBool());
         QSignalSpy spy(&map,&StationMap::stationSelected);
         QTRY_VERIFY_WITH_TIMEOUT(js(view,"!!bridge").toBool(),5000);
