@@ -12,7 +12,19 @@
 - 管理表格原本预设 720×620，通用弹窗策略却缩成 320×345；现在保留预设大小并扣除窗口边框、限制在屏幕/所属窗口范围内。长详情滚动，标题关闭按钮保持可见。
 - 嵌套 JSON 原本经 `QVariant::toString()` 变空；现在保留修改前后值和嵌套数组。业务时间固定显示北京时间，避免 UTC Linux 上少 8 小时。
 
-两个远端分支的 `schema.sql` 相同，本次没有重建业务表或添加新迁移。验证了已有 schema 再次初始化后保留业务记录。未获得用户现有数据库副本，不能断言其手工修改与仓库一致；也未收到演示视频，因此截图中的具体视频效果尚未逐项核对。
+两个远端分支的 `schema.sql` 相同，本次没有重建业务表或添加新迁移。验证了已有 schema 再次初始化后保留业务记录。后续已在本地 assignment 的现有数据库上验证预测接口，并完成原地升级，见下节。assignment 中的 `测试问题.zip` 是 9 月 8 日的问题清单，三个视频对应用户充电金额、统计刷新和返回导航；没有发现本次管理端负荷预测的专门录屏。
+
+## 本地 assignment 已原地升级
+
+2026-09-10，将 `/home/liuzihang/ljw-gf/assignment` 从 `29d0042` 快进到整合版本 `00382ca`，没有另建旧 assignment 副本。沿用该目录的 `.env`、`.env.local`、PostgreSQL 和运行端口；没有重新执行业务 seed 或重建现有数据库。
+
+- 使用 assignment 自己的 `.venv` 安装依赖、`.runtime/qt-build` 编译两端，补齐 Qt Multimedia SDK。
+- 在 assignment 中重跑 CTest：5/5 组通过（摄像头用例因无设备跳过）；实际 API 与独立 schema 的原生集成测试 5 项通过；同期预测单元、数据库完整性、资金与并发回归均通过。
+- `scripts/package_qt_delivery.py --linux-only` 更新实际预览使用的 `deliverables/qt/linux`，包含 FFmpeg 多媒体插件；此选项跳过旧演示文档和压缩包生成。
+- 重启 `assignment-public:web`、`assignment-qt-public:admin/user`，网关和路由继续沿用原进程。通过 noVNC 连接确认两端窗口正常，实际查看了新预测页。运行中两端二进制 SHA256 与新构建相同。
+- 更新前后业务行数相同：17 个站点、13 个用户、53 个订单；历史观测 1,194,600 条。回归测试使用独立 schema 并在完成后删除。
+
+本地本轮日志与窗口截图位于 `.runtime/assignment-integration/`，包括 `build.log`、`ctest.log`、`integration.log`、`forecast-api.log`、`preview-forecast.png` 和 `preview-user.png`。程序继续在原 API 4173 和 Qt 预览 6082 端口运行。
 
 ## Linux 准备与启动
 

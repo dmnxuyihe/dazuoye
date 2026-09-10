@@ -1,11 +1,16 @@
 """Assemble Qt binaries/dependencies and coherent source; no product acceptance runs."""
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import os
 import shutil
 import subprocess
 import zipfile
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--linux-only', action='store_true', help='Update the Linux runtime without rebuilding legacy documents/archives')
+args = parser.parse_args()
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'deliverables/qt'
@@ -19,7 +24,7 @@ for name in ['electra-user','electra-admin']:
     shutil.copy2(ROOT/'.runtime/qt-build'/name,temporary)
     temporary.replace(LINUX/'bin'/name)
     (LINUX/'bin'/name).chmod(0o755)
-for group,names in {'platforms':['libqxcb.so','libqoffscreen.so','libqminimal.so'],'sqldrivers':['libqsqlite.so'],'tls':['libqopensslbackend.so','libqcertonlybackend.so'],'imageformats':['libqjpeg.so','libqsvg.so','libqgif.so'],'iconengines':['libqsvgicon.so'],'xcbglintegrations':['libqxcb-glx-integration.so','libqxcb-egl-integration.so']}.items():
+for group,names in {'platforms':['libqxcb.so','libqoffscreen.so','libqminimal.so'],'sqldrivers':['libqsqlite.so'],'tls':['libqopensslbackend.so','libqcertonlybackend.so'],'imageformats':['libqjpeg.so','libqsvg.so','libqgif.so'],'iconengines':['libqsvgicon.so'],'xcbglintegrations':['libqxcb-glx-integration.so','libqxcb-egl-integration.so'],'multimedia':['libffmpegmediaplugin.so']}.items():
     target=LINUX/'plugins'/group;target.mkdir(exist_ok=True)
     for name in names:
         source=SDK/'plugins'/group/name
@@ -61,6 +66,9 @@ for package in (ROOT/'.runtime/qt-deps/usr/share/doc').glob('*'):
     notice=package/'copyright'
     if notice.is_file():
         dest=LINUX/'licenses/ubuntu'/package.name;dest.mkdir(parents=True,exist_ok=True);shutil.copy2(notice,dest/'copyright')
+if args.linux_only:
+    print(json.dumps({'linux': str(LINUX), 'qt_version': '6.5.3', 'multimedia_backend': 'ffmpeg'}, ensure_ascii=False))
+    raise SystemExit(0)
 shutil.copy2(ROOT/'docs/QT_MIGRATION.md',OUT/'使用与架构说明.md')
 shutil.copy2(ROOT/'docs/QT_MAP_FIX.md',OUT/'地图修复说明.md')
 shutil.copy2(ROOT/'docs/QT_WEB_PARITY.md',OUT/'原生页面重构说明.md')
