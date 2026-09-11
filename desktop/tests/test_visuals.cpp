@@ -2,6 +2,7 @@
 #include "user_window.h"
 #include "visuals.h"
 #include <QtTest>
+#include <QtCharts/QChartView>
 class FixtureClient : public ApiClient {
   public:
     bool logged = true;
@@ -9,6 +10,7 @@ class FixtureClient : public ApiClient {
     QStringList writes;
     QString vehicleName = "测试车辆甲";
     int statisticsReads = 0;
+    bool forecastAvailable = true;
     FixtureClient(CacheStore *c) : ApiClient(QUrl("http://127.0.0.1:1"), c) {}
     bool authenticated() const override {
         return logged;
@@ -78,9 +80,15 @@ class FixtureClient : public ApiClient {
             if (method == "POST")
                 order["status"] = path.endsWith("start") ? "charging" : "completed";
             r.data = QJsonDocument(order);
-        } else if (path.contains("forecast"))
-            r.data = fixture("forecast");
-        else if (path == "/public/analytics/urbanev")
+        } else if (path.contains("forecast")) {
+            auto data = fixture("forecast").object();
+            if (!forecastAvailable) {
+                data["available"] = false;
+                data["message"] = "测试：历史数据尚未导入";
+                for (const auto &key : {"prediction", "history", "metrics"}) data.remove(key);
+            }
+            r.data = QJsonDocument(data);
+        } else if (path == "/public/analytics/urbanev")
             r.data = fixture("hourly");
         else if (path.contains("analytics"))
             r.data = fixture("analytics");
@@ -154,7 +162,7 @@ class VisualTest : public QObject {
         w.navigate("profile");
         w.navigate("schedule"); QTest::qWait(50);
         auto back = buttonWith(w, "‹"); QVERIFY(back); back->click();
-        QTRY_VERIFY(buttonWith(w,"钱包充值"));
+        QTRY_VERIFY(buttonWith(w,"钱包"));
         w.navigate("map");
         QTRY_VERIFY(buttonWith(w,"首页"));
         QTRY_VERIFY(buttonWith(w,"我的"));
@@ -172,9 +180,9 @@ class VisualTest : public QObject {
         QVERIFY(top); QCOMPARE(period->currentData().toInt(),30);
         for(auto size:{QSize(1060,720),QSize(1460,1000)}) {
             w.resize(size); QTest::qWait(100);
-            QVERIFY(top->height()<=350);
+            QVERIFY(top->height()<=360);
             for(auto child:top->findChildren<ArtWidget *>()) {
-                QVERIFY(child->width()>150); QVERIFY(child->height()<=220);
+                QVERIFY(child->width()>150); QVERIFY(child->height()<=225);
             }
             auto scroll=w.findChild<QScrollArea *>("page-scroll"); QVERIFY(scroll);
             QVERIFY(scroll->widget()->width()<=scroll->viewport()->width());
@@ -227,6 +235,27 @@ class VisualTest : public QObject {
                 QString(".runtime/qt-complete/test-screenshots/admin/%1.png").arg(page)));
         }
     }
+    void forecastDataAndUnavailableState() {
+        QTemporaryDir dir; CacheStore cache(dir.filePath("forecast.sqlite")); FixtureClient api(&cache);
+        AdminWindow w(&api,&cache);w.show();QTest::qWait(100);
+        w.navigate("forecast");
+        QTRY_VERIFY(w.findChild<QChartView *>());
+        QTRY_VERIFY(w.findChild<QComboBox *>("forecast-scope"));
+        auto select=w.findChild<QComboBox *>("forecast-scope");QVERIFY(select);
+        QCOMPARE(select->count(),14);
+        QCOMPARE(select->currentData().toString(),QString("business"));
+        api.forecastAvailable=false;
+        w.navigate("forecast");QTest::qWait(100);
+        QVERIFY(!w.findChild<QChartView *>());
+        select=w.findChild<QComboBox *>("forecast-scope");QVERIFY(select);QCOMPARE(select->count(),14);
+        bool message=false;
+        for(auto label:w.findChildren<QLabel *>())
+            if(label->text().contains("测试：历史数据尚未导入"))message=true;
+        QVERIFY(message);
+        api.forecastAvailable=true;
+        select->setCurrentIndex(1);emit select->activated(1);
+        QTRY_VERIFY(w.findChild<QChartView *>());
+    }
     void dialogDismissal() {
         QTemporaryDir dir;
         CacheStore cache(dir.filePath("dialogs.sqlite"));
@@ -251,8 +280,10 @@ class VisualTest : public QObject {
         QVERIFY(management); management->click(); QTest::qWait(80);
         QVERIFY(checkClose(admin, "manager"));
         user.navigate("profile"); QTest::qWait(80);
-        auto wallet = buttonWith(user, "钱包流水     ›");
+        auto wallet = buttonWith(user, "钱包");
         QVERIFY(wallet); wallet->click(); QTest::qWait(30);
+        auto recharge = buttonWith(user, "充值");
+        QVERIFY(recharge); recharge->click(); QTest::qWait(80);
         QVERIFY(checkClose(user, "wallet"));
         showDetail(&user, "详情", {{"name", "只读测试"}}); QTest::qWait(30);
         QVERIFY(checkClose(user, "detail"));

@@ -693,8 +693,8 @@ void AdminWindow::stationsPage() {
     QVBoxLayout *left, *right;
     auto a = card("车辆与站点", &left);
     a->setMaximumWidth(370);
-    auto car = new ArtWidget(ArtWidget::Car);
-    car->setFixedHeight(210);
+    auto car = new ArtWidget(ArtWidget::VerticalCar);
+    car->setFixedHeight(260);
     left->addWidget(car);
     for (const auto &v : stations) {
         auto o = v.toObject();
@@ -838,7 +838,8 @@ void AdminWindow::ordersPage() {
             continue;
         ++count;
         auto info = label(text(o, "station_name") + "   ·   " + text(o, "charger_code") + "\n" +
-                              maskedPhone(text(o, "phone")) + "   " + text(o, "reserved_at"),
+                              maskedPhone(text(o, "phone")) + "   " +
+                                  localDateTime(text(o, "reserved_at")),
                           "font-size:13px;");
         auto status = label(statusText(text(o, "status")), "color:#c992e1;");
         auto cost = label(money(number(o, "energy_kwh")) + " kWh\n¥" + money(number(o, "amount")));
@@ -1009,7 +1010,7 @@ void AdminWindow::auditPage() {
             r->addLayout(textcol, 1);
             r->addWidget(label(localTime.time().toString("HH:mm:ss"), "color:#a88eba;font-size:11px;"));
             r->addWidget(button("查看 ↗", content, [=] {
-                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + text(o, "created_at") +
+                selectedLabel->setText(actionLabel(action) + "\n\n时间  " + localDateTime(text(o, "created_at")) +
                                        "\n\n对象  " + text(o, "target_type") + "\n" +
                                        text(o, "target_id"));
                 QJsonObject details{{"操作编号",text(o,"id")}, {"操作名称",actionLabel(action)},
@@ -1095,11 +1096,12 @@ void AdminWindow::auditPage() {
     paging->hide();
 }
 void AdminWindow::forecastPage() {
-    body->addWidget(label("ENERGY INTELLIGENCE / 历史实验",
+    body->addWidget(label("ENERGY INTELLIGENCE / 历史同期模拟",
                           "font-size:10px;letter-spacing:2px;color:#a18bb9;"));
-    body->addWidget(label("负荷预测", "font-size:30px;font-weight:600;"));
+    body->addWidget(label("历史同期负荷预测", "font-size:30px;font-weight:600;"));
     body->addWidget(
-        label("从历史充电节律，观察未来 24 小时的能源需求。", "font-size:12px;color:#b09ac2;"));
+        label("根据当前自然日期匹配 UrbanEV 同期历史日期，模拟预测当天 24 小时负荷。",
+              "font-size:12px;color:#b09ac2;"));
     auto host = new QWidget;
     auto layout = new QVBoxLayout(host);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -1118,6 +1120,7 @@ void AdminWindow::forecastPage() {
             return;
         }
         auto select = new QComboBox;
+        select->setObjectName("forecast-scope");
         for (const auto &v : d.value("scopes").toArray()) {
             auto o = v.toObject();
             select->addItem(text(o, "label"), text(o, "id"));
@@ -1127,9 +1130,25 @@ void AdminWindow::forecastPage() {
             forecastScope = select->itemData(i).toString();
             navigate("forecast");
         });
+        const auto range = d.value("dataset_range").toObject();
+        const QString mappedDate = text(d, "mapped_date");
         layout->addWidget(row(
-            {label("历史实验 · 非实时   数据截止 " + text(d, "cutoff"), "color:#e3b0df;"), select},
+            {label(QString("当前日期：%1　同期映射日期：%2　数据集：UrbanEV　预测模式：历史同期模拟预测")
+                       .arg(text(d, "current_date"), mappedDate.isEmpty() ? "无对应日期" : mappedDate),
+                   "color:#e3b0df;"),
+             select},
             {3, 1}));
+        layout->addWidget(label(
+            QString("数据覆盖：%1 ~ %2").arg(text(range, "start"), text(range, "end")),
+            "color:#a98fba;font-size:11px;"));
+        if (!d.value("available").toBool(true)) {
+            layout->addWidget(emptyPanel("暂无可用的同期预测",
+                                         text(d, "message"), "history"));
+            return;
+        }
+        if (!d.value("history_sufficient").toBool())
+            layout->addWidget(label(text(d, "strategy_message"),
+                                    "color:#edcd79;font-size:12px;"));
         auto history = d.value("history").toArray(), pred = d.value("prediction").toArray();
         const auto historyDates = d.value("history_dates").toArray();
         const auto futureDates = d.value("future_dates").toArray();
@@ -1149,10 +1168,12 @@ void AdminWindow::forecastPage() {
                  metricCard("预测小时峰值", money(peak) + " kWh",
                             peakTime.toString("MM-dd HH:mm") + " · 该小时预测电量"),
                  metricCard("已选用模型", text(d, "model"),
-                            QString("经验范围测试覆盖率 %1%").arg(number(d, "test_coverage")))}));
+                            d.value("history_sufficient").toBool()
+                                ? "按目标日期之前的历史样本训练"
+                                : "历史不足，已使用简化预测策略")}));
         QVBoxLayout *chartLayout;
         auto box = card("充电需求趋势 · 最近48小时与未来24小时", &chartLayout);
-        auto chart = baseChart("横轴：日期与小时　　纵轴：每小时充电电量（kWh）");
+        auto chart = baseChart("");
         auto a = new QLineSeries;
         a->setName("历史");
         auto b = new QLineSeries;
@@ -1189,7 +1210,7 @@ void AdminWindow::forecastPage() {
         connect(b, &QLineSeries::hovered, host,
                 [showPoint](const QPointF &point, bool state) { showPoint("预测电量", point, state); });
         auto band = new QAreaSeries(hi, lo);
-        band->setName("经验误差范围");
+        band->setName(d.value("interval_calibrated").toBool() ? "验证期经验误差范围" : "历史不足，未校准误差范围");
         band->setBrush(QColor("#554f2769"));
         band->setPen(Qt::NoPen);
         chart->addSeries(band);
@@ -1198,7 +1219,7 @@ void AdminWindow::forecastPage() {
         auto xAxis = new QDateTimeAxis;
         xAxis->setFormat("MM-dd\nHH:mm");
         xAxis->setTickCount(7);
-        xAxis->setTitleText("过去48小时　　　　　　　　　│ 预测开始 │　　　　　　　　　未来24小时");
+        xAxis->setTitleText(QString("过去%1小时 / 预测24小时 · 北京时间").arg(history.size()));
         xAxis->setRange(QDateTime::fromString(historyDates.first().toString(), Qt::ISODate),
                         QDateTime::fromString(futureDates.last().toString(), Qt::ISODate));
         auto yAxis = new QValueAxis;
@@ -1213,7 +1234,7 @@ void AdminWindow::forecastPage() {
                 yMin = qMin(yMin, point.y());
                 yMax = qMax(yMax, point.y());
             }
-        yAxis->setRange(qMax(0.0, yMin), yMax);
+        yAxis->setRange(qMax(0.0, yMin), qMax(yMax, yMin + 1.0));
         chart->addAxis(xAxis, Qt::AlignBottom);
         chart->addAxis(yAxis, Qt::AlignLeft);
         for (auto series : QList<QAbstractSeries *>{band, a, b}) {
@@ -1228,7 +1249,7 @@ void AdminWindow::forecastPage() {
         }
         chartLayout->addWidget(view(chart, 340));
         layout->addWidget(box);
-        layout->addWidget(label("三种预测方法对比 · WAPE、MAE 均为越低越好",
+        layout->addWidget(label("可用预测方法对比 · 最近验证期误差，越低越好",
                                 "font-size:15px;font-weight:600;color:#e6d6ed;"));
         QList<QWidget *> metrics;
         double bestWape = std::numeric_limits<double>::max();
@@ -1242,14 +1263,15 @@ void AdminWindow::forecastPage() {
             if (selected)
                 caption += " · 本次采用";
             else if (lowest)
-                caption += " · 区域平均误差最低";
+                caption += " · 验证误差最低";
             metrics << metricCard(
-                caption, QString::number(number(m, "wape"), 'f', 3) + "% WAPE",
-                QString("每小时测试平均误差 %1 kWh · 验证误差 %2 kWh")
-                    .arg(money(number(m, "mae")), money(number(m, "validation_mae"))));
+                caption, m.value("wape").isNull() ? "暂无验证数据"
+                    : QString::number(number(m, "wape"), 'f', 3) + "% WAPE",
+                m.value("mae").isNull() ? "历史不足，无法评估预测误差"
+                    : QString("验证期每小时平均绝对误差 %1 kWh").arg(money(number(m, "mae"))));
         }
         layout->addWidget(row(metrics));
-        layout->addWidget(label(text(d, "protocol") + "\n" + text(d, "limitations"),
+        layout->addWidget(label(text(d, "scope_note") + "\n" + text(d, "protocol") + "\n" + text(d, "limitations"),
                                 "color:#aa91ba;font-size:12px;"));
     });
 }
@@ -1334,6 +1356,7 @@ void AdminWindow::manager(const QString &kind) {
                                     .value(kind, "运营数据管理");
     auto d = new QDialog(this);
     d->setAttribute(Qt::WA_DeleteOnClose);
+    d->setProperty("preserveDialogSize", true);
     d->setWindowTitle(managerName);
     d->resize(kind == "users" ? 1200 : 1100, 650);
     auto layout = new QVBoxLayout(d);
@@ -1424,17 +1447,23 @@ void AdminWindow::manager(const QString &kind) {
             table->setColumnCount(columns.size());
             table->setHorizontalHeaderLabels(headings);
             table->setRowCount(items->size());
-            for (int i = 0; i < items->size(); i++)
-                for (int j = 0; j < columns.size(); j++)
-            table->setItem(
-                        i, j,
-                        new QTableWidgetItem(kind == "users" && columns[j] == "id"
-                            ? userNumber((*items)[i].toObject())
-                            : kind == "users" && columns[j] == "phone"
-                                ? maskedPhone(text((*items)[i].toObject(), "phone"))
-                            : kind == "stations" && columns[j] == "id"
-                                ? stationNumber(stations, text((*items)[i].toObject(), "id"))
-                            : statusText(text((*items)[i].toObject(), columns[j]))));
+            for (int i = 0; i < items->size(); i++) {
+                const auto item = (*items)[i].toObject();
+                for (int j = 0; j < columns.size(); j++) {
+                    QString value;
+                    if (kind == "users" && columns[j] == "id")
+                        value = userNumber(item);
+                    else if (kind == "users" && columns[j] == "phone")
+                        value = maskedPhone(text(item, "phone"));
+                    else if (kind == "stations" && columns[j] == "id")
+                        value = stationNumber(stations, text(item, "id"));
+                    else if (columns[j].endsWith("_at"))
+                        value = localDateTime(text(item, columns[j]));
+                    else
+                        value = statusText(text(item, columns[j]));
+                    table->setItem(i, j, new QTableWidgetItem(value));
+                }
+            }
             auto header = table->horizontalHeader();
             header->setStretchLastSection(false);
             for (int j = 0; j < columns.size(); ++j)

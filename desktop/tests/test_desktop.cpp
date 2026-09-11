@@ -71,7 +71,7 @@ class DesktopTest : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(avatarSaved,10000);
         const auto savedAvatar=call(api,"GET","/me");QVERIFY(savedAvatar.ok);
         QImage stored;QVERIFY(stored.loadFromData(QByteArray::fromBase64(text(savedAvatar.data.object(),"avatar_data").toLatin1()),"PNG"));
-        QCOMPARE(stored.convertToFormat(QImage::Format_RGB32),expectedAvatar);
+        QCOMPARE(stored.convertToFormat(QImage::Format_ARGB32),expectedAvatar.convertToFormat(QImage::Format_ARGB32));
         // Changes made through the API must appear without navigating or manually refreshing.
         w.navigate("home");
         QVERIFY(call(api,"PUT","/me/vehicle",{{"vehicle_name","跨端同步车辆"},{"vehicle_plate","粤BQT901"},
@@ -85,8 +85,10 @@ class DesktopTest : public QObject {
         auto occupancy=observer.findChild<ArtWidget *>("fleet-occupancy");
         QCOMPARE(occupancy->property("displayValue").toDouble(),0.);
         w.navigate("profile");
-        QTRY_VERIFY_WITH_TIMEOUT(findButton(&w, "钱包充值"), 10000);
-        auto recharge = findButton(&w, "钱包充值");
+        QTRY_VERIFY_WITH_TIMEOUT(findButton(&w, "钱包"), 10000);
+        QTest::mouseClick(findButton(&w, "钱包"), Qt::LeftButton);
+        QTRY_VERIFY_WITH_TIMEOUT(findButton(&w, "充值"), 10000);
+        auto recharge = findButton(&w, "充值");
         QVERIFY(recharge);
         QTest::mouseClick(recharge, Qt::LeftButton);
         QTRY_VERIFY(w.findChild<QLineEdit *>("amount"));
@@ -186,13 +188,17 @@ class DesktopTest : public QObject {
              QStringList{"dashboard", "station", "trips", "history", "forecast"}) {
             w.navigate(page);
             if (page == "forecast")
-                QTRY_VERIFY_WITH_TIMEOUT(hasText(&w, "经验范围测试覆盖率"), 10000);
+                QTRY_VERIFY_WITH_TIMEOUT(hasText(&w, "暂无可用的同期预测"), 10000);
             QCoreApplication::processEvents();
             QVERIFY(w.grab().save(".runtime/qt-migration/integration/admin-" + page + ".png"));
         }
         auto forecast = call(api, "GET", "/admin/console/forecast");
         QVERIFY(forecast.ok);
-        QCOMPARE(forecast.data.object()["prediction"].toArray().size(), 24);
+        QVERIFY(!forecast.data.object()["available"].toBool());
+        QCOMPARE(forecast.data.object()["scopes"].toArray().size(), 14);
+        auto artifact = call(api, "GET", "/admin/console/forecast?mode=artifact&scope=all");
+        QVERIFY(artifact.ok);
+        QCOMPARE(artifact.data.object()["prediction"].toArray().size(), 24);
     }
     void externalPaymentUpdatesOpenStatistics() {
         CacheStore cache(dir.filePath("statistics.sqlite")), writerCache(dir.filePath("writer.sqlite"));
@@ -204,7 +210,7 @@ class DesktopTest : public QObject {
         const auto token=text(login.data.object(),"access_token"); api.session(token);writer.session(token);
         QVERIFY(call(writer,"POST","/wallet/recharges",{{"amount",100},{"idempotency_key",uid()}}).ok);
         UserWindow w(&api,&cache);w.show();w.navigate("stats");
-        QTRY_VERIFY_WITH_TIMEOUT(hasText(&w,"0 笔已支付订单"),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(hasText(&w,"0 笔"),10000);
         QPointer<QWidget> graph=w.findChild<QWidget *>("personal-statistics");QVERIFY(graph);
         const auto stations=call(writer,"GET","/public/stations").data.array();QVERIFY(!stations.isEmpty());
         const auto chargers=call(writer,"GET","/public/stations/"+text(stations[0].toObject(),"id")+"/chargers").data.array();
@@ -216,13 +222,13 @@ class DesktopTest : public QObject {
         QVERIFY(call(writer,"POST","/orders/"+id+"/start").ok);
         QVERIFY(call(writer,"POST","/orders/"+id+"/stop").ok);
         QVERIFY(call(writer,"POST","/orders/"+id+"/pay").ok);
-        QTRY_VERIFY_WITH_TIMEOUT(hasText(&w,"1 笔已支付订单"),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(hasText(&w,"1 笔"),10000);
         QVERIFY(graph); // Data changed in place while the user remained on this screen.
         QVERIFY(w.grab().save(".runtime/qt-migration/integration/user-live-statistics.png"));
         CacheStore reopenedCache(dir.filePath("reopened.sqlite"));
         ApiClient reopened(QUrl(qEnvironmentVariable("ELECTRA_TEST_API")),&reopenedCache);reopened.session(token);
         UserWindow restored(&reopened,&reopenedCache);restored.show();restored.navigate("stats");
-        QTRY_VERIFY_WITH_TIMEOUT(hasText(&restored,"1 笔已支付订单"),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(hasText(&restored,"1 笔"),10000);
     }
 };
 QTEST_MAIN(DesktopTest)

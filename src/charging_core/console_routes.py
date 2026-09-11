@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Response, HTTPException, Query
-from .forecast import console_forecast, console_scopes, load_forecast
+from .forecast import console_forecast, console_scopes, load_forecast, same_period_snapshot
 from pydantic import BaseModel, Field, field_validator
 from .service import ChargingService
 
@@ -65,10 +65,17 @@ def build_console_router(get_service, require_admin):
     @router.get("/console/forecast")
     async def forecast(
         _: Admin,
+        s: Service,
+        mode: Literal["same_period", "artifact"] = "same_period",
         scope: str = Query(
             default="business", pattern=r"^(all|business|station-[0-9]{1,6})$"
         ),
     ):
+        if mode == "same_period":
+            result = await same_period_snapshot(s.pool, scope)
+            if result is None:
+                raise HTTPException(status_code=404, detail="站点不存在")
+            return result
         artifact = load_forecast()
         if artifact is None:
             return {"ready": False, "message": "尚未生成历史预测，请运行训练脚本。"}

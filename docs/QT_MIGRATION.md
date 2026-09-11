@@ -1,6 +1,8 @@
 # Qt 当前实现与验收基线
 
-更新日期：2026-09-09。本文件是 Qt 范围、数据映射和验收状态的当前权威说明。其他带日期的 QT_* 文档保留历史记录，其中“跳过验收”、演示固定值、旧地图实现等描述不代表当前版本。
+更新日期：2026-09-10。当前两分支整合、同期预测和 Linux 验证以 [整合说明](INTEGRATION_LINUX.md) 为准。下文保留已有功能基线及历史证据。
+
+本文件是 Qt 范围、数据映射和验收状态的当前权威说明。其他带日期的 QT_* 文档保留历史记录，其中“跳过验收”、演示固定值、旧地图实现等描述不代表当前版本。
 
 ## 范围与架构
 
@@ -51,7 +53,7 @@ Qt → QNetworkAccessManager REST / QWebSocket → FastAPI → PostgreSQL。Post
 
 头像编辑为原生 Qt：导入 PNG/JPEG 并应用 EXIF 方向、拖动方形裁剪、缩放、旋转、水平翻转、亮度和重置；圆形虚线提示实际头像显示范围。三张示例复用已有车辆/充电素材。保存的是处理后的 256×256 PNG，通过 `/me/avatar` 写入 PostgreSQL，取消不保存。`test-editing` 覆盖图像像素变化、状态变更后选桩失效、离线禁用和窄屏布局；真实集成测试另验证编辑→保存→API 读回的像素一致性。
 
-本次 Linux 构建、5 组 CTest、X11 编辑测试（5 项，含初始化/清理）及隔离数据库集成测试（5 项，含初始化/清理）通过。可随源码查看 [Qt 回归日志](qt-current/ctest.log)、[X11 编辑日志](qt-current/editing-x11.log)、[数据库集成日志](qt-current/integration.log)、[选桩页面](qt-current/user-station.png)、[四种状态卡片](qt-current/charger-cards.png) 和 [头像编辑器](qt-current/avatar-editor.png)。详细本地证据位于 `.runtime/qt-cards-avatar/`。Windows 未构建运行。
+本次 Linux 构建、5 组 CTest、X11 编辑测试（5 项，含初始化/清理）及隔离数据库集成测试（5 项，含初始化/清理）通过。详细本地证据位于被忽略的 `.runtime/qt-cards-avatar/`。Windows 未构建运行。
 
 仓库沿用原远端提交历史，将源码提升至根目录；旧交付二进制、压缩包、数据库导出和演示材料保留在历史提交中。当前 `.env`、运行环境、数据库和本地交付包不纳入 Git。源码空白检查通过；第三方 Leaflet CSS 与许可证保留上游 CRLF，不做格式改写。
 
